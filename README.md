@@ -107,16 +107,18 @@ Model access is the **Claude Agent SDK on the Max plan** — no `ANTHROPIC_API_K
 ```bash
 # Pipeline + offline gates (deterministic, no credit): loader, unseen split,
 # metric math, the full loop (resolve/escalate/triage), guardrail, confidence.
-uv run pytest -q                       # 25 tests + 1 gated
+uv run pytest -q                       # 30 tests + 1 gated
 
 # Validate the real embedding retriever (downloads all-MiniLM-L6-v2):
 FEEDBACK_AGENT_RUN_EMBED=1 uv run pytest -q -k embedding
 
-# Live numbers (spend Agent SDK credit; populate the SQLite cache, re-runs are free):
-#   diagnosis accuracy — run the harness live (drop force_offline);
-#   efficacy gap       — eval/efficacy.py::run_efficacy;
-#   % auto-taggable    — eval/tagging.py::run_tagging (self-consistency).
-# See STATUS.md for the exact one-liners used and the resulting numbers.
+# Real Eedi headline numbers (needs data/train.csv; spends credit; cached+resumable):
+uv run python -m eval.benchmark --n 50 --k 1     # top-1 / MAP@25 / recall@25
+uv run python -m eval.benchmark --n 25 --k 3     # + confidence / % auto-taggable / time-saved
+
+# Other live experiments:
+#   efficacy gap    — eval/efficacy.py::run_efficacy
+#   ASAP QWK        — eval/asap.py::run_asap_grading (needs data/asap/train.tsv)
 ```
 
 ## Run the app
