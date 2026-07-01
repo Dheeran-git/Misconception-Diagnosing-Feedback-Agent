@@ -118,6 +118,15 @@ ASSESS step + grade cache instead. QWK scaffolding is in place for the stretch.
 > hint — directional, not statistical. The methodology (live learner reasons
 > about hint content, resolution well-defined vs a known misconception) is what
 > generalizes; the full-size number comes from running it on real Eedi.
+> **Confidence FAILURE MODE (honest):** on the 6 one-per-misconception items
+> (which include held-out *unseen* misconceptions — the hardest subset), the
+> diagnoser scored top-1 0.167, and at threshold 0.7 it auto-tagged exactly one
+> item — which was WRONG (accuracy-on-autotagged 0.000). So self-consistency
+> confidence is *miscalibrated* here: one confidently-wrong case slipped the
+> filter while 5/6 uncertain cases were correctly routed to triage. Causes: k=3
+> gives coarse confidence (only 0.33/0.67/1.0); synthetic n=6 on the unseen slice.
+> The triage *mechanism* is sound; calibration + a tuned threshold need real Eedi.
+> We are NOT reporting a teacher-time-saved "win" from this.
 
 | Metric | Value | Split | Date |
 |---|---|---|---|
@@ -125,8 +134,9 @@ ASSESS step + grade cache instead. QWK scaffolding is in place for the stretch.
 | Misconception MAP@k (k=25) | v2: 0.590 dev / 0.300 held (v1: 0.558 / 0.321) | fixture, live Opus 4.8 | 2026-07-01 |
 | Retrieval recall@k (retrieval ceiling) | 1.000 (in-context, small taxonomy); embedding path validated | fixture | 2026-07-01 |
 | — offline-stub baseline (pipeline smoke) | top1 0.00 / MAP@25 0.35 | dev (fixture) | 2026-07-01 |
-| % auto-taggable @ threshold | _live self-consistency run in progress_ (k=3, thr 0.7) | fixture | 2026-07-01 |
-| Teacher tagging time saved (headline) | _derived from % auto-taggable — run in progress_ | fixture | 2026-07-01 |
+| % auto-taggable @ threshold | 0.167 (1/6) @ conf≥0.7, k=3 | fixture, live | 2026-07-01 |
+| accuracy on auto-tagged slice | **0.000** (the 1 auto-tagged item was wrong — miscalibration, see note) | fixture, live | 2026-07-01 |
+| Teacher tagging time saved (headline) | 0.167 mechanically (5/6 correctly routed to triage) — NOT a clean win on this hard subset | fixture, live | 2026-07-01 |
 | Remediation efficacy (targeted vs generic) | **live gap +1.000** (targeted 2/2 resolved, generic 0/2, both triaged; n=2/arm, 1 hint) · offline mechanism gap 1.000 | fixture (live learner) | 2026-07-01 |
 | QWK on ASAP free-response (optional stretch) | — | | |
 
