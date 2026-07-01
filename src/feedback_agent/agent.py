@@ -28,10 +28,12 @@ from dataclasses import dataclass, field
 from typing import Protocol
 
 from . import config, state
+from .confidence import diagnose_with_confidence, should_triage
 from .diagnosis import diagnose_baseline
 from .grading import answers_equivalent
 from .models import Diagnosis, DiagnosisItem, Intervention, LearnerAttempt
 from .remediation import generate_intervention
+from .trace import TraceLogger
 
 
 class Learner(Protocol):
@@ -77,10 +79,19 @@ def run_loop(
     diagnosis_model: str | None = None,
     remediation_model: str | None = None,
     k: int | None = None,
+    with_confidence: bool = False,
+    triage_threshold: float | None = None,
+    trace: TraceLogger | None = None,
 ) -> LoopResult:
     """Run the full loop for one item + learner. ``arm`` selects targeted vs
-    generic remediation (the efficacy experiment's two conditions)."""
+    generic remediation (the efficacy experiment's two conditions).
+
+    ``with_confidence`` runs self-consistency (k diagnosis samples) and routes
+    low-confidence diagnoses to the teacher queue (FR5) *in addition to* the
+    unresolved-after-escalation route. ``trace`` logs every step to a JSONL file.
+    """
     max_escalations = config.MAX_ESCALATIONS if max_escalations is None else max_escalations
+    threshold = config.TRIAGE_CONFIDENCE_THRESHOLD if triage_threshold is None else triage_threshold
     targeted = arm == "targeted"
     own_conn = conn is None
     if conn is None:
@@ -97,6 +108,8 @@ def run_loop(
             payload=json.dumps(payload, default=str),
             chosen_answer=item.chosen_answer,
         )
+        if trace is not None:
+            trace.log(step, {"question_id": item.question_id, **payload})
 
     try:
         # 1) ASSESS — the learner's unaided attempt.
@@ -111,13 +124,32 @@ def run_loop(
 
         # 2) DIAGNOSE the misconception behind the wrong answer.
         candidates = retriever.candidates(item, k=k if k is not None else config.RETRIEVAL_K)
-        diagnosis, _ = diagnose_baseline(
-            item, candidates, conn=conn, force_offline=force_offline, model=diagnosis_model
-        )
+        if with_confidence:
+            diagnosis, _ = diagnose_with_confidence(
+                item, candidates, conn=conn, force_offline=force_offline, model=diagnosis_model
+            )
+        else:
+            diagnosis, _ = diagnose_baseline(
+                item, candidates, conn=conn, force_offline=force_offline, model=diagnosis_model
+            )
         record(
             "diagnose",
-            {"misconception_id": diagnosis.misconception_id, "label": diagnosis.label},
+            {
+                "misconception_id": diagnosis.misconception_id,
+                "label": diagnosis.label,
+                "confidence": diagnosis.confidence,
+            },
         )
+
+        # Low-confidence diagnosis → teacher review (FR5), independent of whether
+        # the student later self-corrects.
+        low_confidence = with_confidence and should_triage(diagnosis.confidence, threshold)
+        if low_confidence:
+            state.enqueue_triage(
+                conn, question_id=item.question_id, diagnosis=diagnosis,
+                confidence=diagnosis.confidence,
+            )
+            record("triage", {"reason": "low confidence", "confidence": diagnosis.confidence})
 
         # 3) REMEDIATE → VERIFY → ESCALATE (capped).
         resolved = False
@@ -142,9 +174,10 @@ def run_loop(
             if resolved:
                 break
 
-        # 4) ROUTE unresolved cases to the teacher triage queue (FR5).
-        routed = not resolved
-        if routed:
+        # 4) ROUTE unresolved cases to the teacher triage queue (FR5). Skip if the
+        #    low-confidence route already queued this item (no double-queue).
+        unresolved = not resolved
+        if unresolved and not low_confidence:
             state.enqueue_triage(
                 conn, question_id=item.question_id, diagnosis=diagnosis,
                 confidence=diagnosis.confidence,
@@ -154,7 +187,7 @@ def run_loop(
         return LoopResult(
             question_id=item.question_id, arm=arm, unaided_correct=False, resolved=resolved,
             interventions_used=interventions, escalations_used=max(0, interventions - 1),
-            routed_to_triage=routed, diagnosis=diagnosis, steps=steps,
+            routed_to_triage=unresolved or low_confidence, diagnosis=diagnosis, steps=steps,
         )
     finally:
         if own_conn:

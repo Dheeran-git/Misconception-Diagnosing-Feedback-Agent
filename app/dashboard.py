@@ -125,7 +125,20 @@ def _render_student(st, data, conn, force_offline):
 def _render_teacher(st, data, conn):
     st.header("Teacher tagging-triage queue")
     rows = triage_rows(conn)
-    st.metric("Items awaiting review", len(rows))
+
+    # Metrics panel
+    distinct = len({r["question_id"] for r in rows})
+    low_conf = sum(1 for r in rows if (r["confidence"] or 0.0) < 0.7)
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Items awaiting review", len(rows))
+    c2.metric("Distinct questions", distinct)
+    c3.metric("Flagged low-confidence 🔴", low_conf)
+    st.caption(
+        "Headline eval numbers (diagnosis accuracy, % auto-taggable, efficacy gap) "
+        "are reproduced from the harness — see STATUS.md / README.md."
+    )
+    st.divider()
+
     if not rows:
         st.info("Queue is empty. Run the batch tagging pipeline to populate it.")
         return

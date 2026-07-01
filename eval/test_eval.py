@@ -346,6 +346,62 @@ def test_tagging_pipeline_offline(dataset, db):
     assert 0.0 <= m["accuracy_on_autotagged"] <= 1.0
 
 
+def test_sympy_math_equivalence():
+    from feedback_agent.grading import answers_equivalent
+    from feedback_agent.tools.math_check import math_equivalent
+
+    assert math_equivalent("1/2", "0.5").equivalent is True
+    assert math_equivalent("2x+3", "3+2*x").equivalent is True
+    assert math_equivalent("x = 4", "4").equivalent is True
+    assert math_equivalent("x = 8", "x = 4").equivalent is False
+    # grading uses it; MCQ option letters still behave
+    assert answers_equivalent("B", "B") is True
+    assert answers_equivalent("A", "B") is False
+
+
+def test_trace_logger_writes_jsonl(tmp_path):
+    from feedback_agent.trace import TraceLogger
+
+    t = TraceLogger("run1", sink_dir=tmp_path)
+    t.log("diagnose", {"misconception_id": "3"})
+    t.log("remediate", {"level": 0})
+    rows = t.read()
+    assert [r["step"] for r in rows] == ["diagnose", "remediate"]
+    assert rows[0]["seq"] == 1 and rows[1]["seq"] == 2
+    assert t.path.exists()
+
+
+def test_loop_writes_trace_and_low_confidence_triages(dataset, db, tmp_path, monkeypatch):
+    from feedback_agent import agent as agent_mod
+    from feedback_agent.agent import run_loop
+    from feedback_agent.state import triage_items
+    from feedback_agent.taxonomy import build_retriever
+    from feedback_agent.trace import TraceLogger
+
+    from .simulated_learner import SimulatedLearner
+
+    # Force a low-confidence diagnosis so the confidence route fires even though
+    # the (targeted) stub learner would otherwise resolve.
+    monkeypatch.setattr(agent_mod, "should_triage", lambda conf, thr=None: True)
+
+    r = build_retriever(dataset.mapping)
+    item = dataset.items[0]
+    gold = item.gold_misconception_id
+    learner = SimulatedLearner(gold, dataset.mapping[gold])
+    trace = TraceLogger("looptest", sink_dir=tmp_path)
+
+    res = run_loop(
+        item, learner, r, arm="targeted", conn=db, force_offline=True,
+        with_confidence=True, k=3, trace=trace,
+    )
+    # low-confidence route queued the item even though the student resolved
+    assert res.routed_to_triage is True
+    assert len(triage_items(db)) == 1
+    # trace file captured the steps
+    steps = [row["step"] for row in trace.read()]
+    assert "diagnose" in steps and "triage" in steps
+
+
 def test_dashboard_helpers_offline(dataset, db):
     # Import the Streamlit app module (must not require a running Streamlit) and
     # exercise its pure helpers offline.

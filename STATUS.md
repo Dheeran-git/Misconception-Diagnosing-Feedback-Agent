@@ -120,6 +120,30 @@ ASSESS step + grade cache instead. QWK scaffolding is in place for the stretch.
 - [ ] Optional active-diagnosis flourish: **cut** (PLAN.md says cut if it risks
       the demo; not worth the hours vs. finishing).
 
+## Gap-closing pass (post-Day-7)
+
+Closed the four buildable gaps from the PRD audit:
+
+- [x] **FR6 SymPy math tool** — `tools/math_check.py`: `math_equivalent`
+      (symbolic/numeric/string) now backs `grading.answers_equivalent`, so ASSESS
+      and VERIFY use SymPy, not string compare ("1/2"=="0.5", "2x+3"=="3+2x").
+      Also exposed as an SDK custom tool; **verified live** that the agent calls
+      `mcp__math__math_check` and returns the right answer.
+- [x] **FR9 trace via SDK hooks** — `trace.py::TraceLogger` writes every loop step
+      to `traces/<run_id>.jsonl`; a PreToolUse SDK hook logs each live tool call to
+      the same trace (**verified live** on the math tool). Wired into `agent.py`.
+- [x] **Confidence in the loop** — `run_loop(with_confidence=True)` runs
+      self-consistency and routes low-confidence diagnoses to triage (FR5) inside
+      the loop, not just the batch tagger.
+- [x] **Dashboard metrics panel** — teacher view now shows queue size / distinct
+      questions / low-confidence count.
+- [x] Tests: 28 green + 1 gated (added SymPy equivalence, trace JSONL, loop
+      trace+low-confidence-triage). Lint clean.
+
+Still deliberately open: ASAP/QWK free-response (optional stretch, scaffolded not
+run); hand-verify ~10 grades vs gold (do on real Eedi); real Eedi data + demo
+video (human).
+
 ## Day-7 deliverables (this session)
 
 - [x] `README.md` rewritten as the writeup: leads with the metrics table + **how

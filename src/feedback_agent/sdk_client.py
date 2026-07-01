@@ -148,6 +148,37 @@ def live_json(prompt: str, schema: dict, *, model: str, system_prompt: str) -> d
     return asyncio.run(_live_json_async(prompt, schema, model=model, system_prompt=system_prompt))
 
 
+async def _check_equiv_async(a: str, b: str, model: str, trace) -> str:
+    """Live agent turn that *calls* the SymPy math_check tool (FR6) and, if a
+    trace is given, logs the tool call via an SDK PreToolUse hook (FR9)."""
+    from claude_agent_sdk import ClaudeAgentOptions
+
+    from .tools.math_check import math_check_server
+    from .trace import sdk_tool_use_hooks
+
+    hooks = {"PreToolUse": sdk_tool_use_hooks(trace)} if trace is not None else None
+    options = ClaudeAgentOptions(
+        model=model,
+        mcp_servers={"math": math_check_server()},
+        allowed_tools=["mcp__math__math_check"],
+        max_turns=4,
+        system_prompt="You verify math equivalence ONLY by calling the math_check tool.",
+        hooks=hooks,
+    )
+    prompt = (
+        f'Call the math_check tool to determine whether "{a}" and "{b}" are '
+        "mathematically equivalent, then state True or False."
+    )
+    _, text = await _collect(prompt, options)
+    return text
+
+
+def check_equivalence_via_agent(a: str, b: str, *, model: str | None = None, trace=None) -> str:
+    """Ask a live agent to verify equivalence by calling the SymPy tool. Returns
+    the agent's final text. Raises if the SDK/auth is unavailable."""
+    return asyncio.run(_check_equiv_async(a, b, model or config.FAST_MODEL, trace))
+
+
 async def _live_diagnose_async(
     item: DiagnosisItem, candidates: list[tuple[str, str]], model: str, template: str
 ) -> Diagnosis:

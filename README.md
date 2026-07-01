@@ -29,7 +29,10 @@ DIAGNOSE ─► REMEDIATE ─► learner re-attempts ─► VERIFY ─resolved�
 
 Written as explicit Python (`src/feedback_agent/agent.py`) — no orchestration
 framework — so every decision (when to escalate, when to route to triage) is
-auditable. Full design in `ARCHITECTURE.md`.
+auditable. The ASSESS/VERIFY steps check answers with **SymPy** (a real tool the
+agent calls, not LLM arithmetic — FR6), and every step is logged to
+`traces/<run_id>.jsonl` via the loop and SDK tool-use hooks (FR9). Full design in
+`ARCHITECTURE.md`.
 
 ## Status
 
@@ -143,11 +146,13 @@ in-context path to the sentence-transformers + Chroma embedding retriever.
 
 ```
 src/feedback_agent/  agent loop, grading, diagnosis, remediation, confidence,
-                     taxonomy/retrieval, state (SQLite), versioned prompts/
+                     taxonomy/retrieval, tools/math_check (SymPy), trace (JSONL),
+                     state (SQLite), versioned prompts/
 eval/                harness, metrics, dataset+split, simulated learner,
                      efficacy + tagging experiments, fixtures, pytest gates
 app/dashboard.py     Streamlit teacher + student views (imports the agent library)
 data/                real Eedi CSVs + cache.sqlite (gitignored)
+traces/              per-run agent traces, *.jsonl (gitignored)
 ```
 
 ## AI-use disclosure

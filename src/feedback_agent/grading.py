@@ -30,12 +30,15 @@ def _norm(s: str) -> str:
 
 
 def answers_equivalent(a: str, b: str) -> bool:
-    """Whether two answers match. MCQ: normalized string/letter compare.
+    """Whether two answers match, using the SymPy math-equivalence tool (FR6) so
+    "1/2" == "0.5" and "2x+3" == "3+2x". Falls back to a normalized string compare
+    for option letters / unparseable text. Never raises."""
+    try:
+        from .tools.math_check import math_equivalent
 
-    Day 4 swaps the body for a SymPy symbolic/numeric check so that e.g.
-    "1/2" and "0.5" compare equal; the MCQ path never needs that.
-    """
-    return _norm(a) == _norm(b)
+        return math_equivalent(a, b).equivalent
+    except Exception:
+        return _norm(a) == _norm(b)
 
 
 def assess(
