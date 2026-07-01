@@ -206,7 +206,7 @@ demo video (human).
 | accuracy on auto-tagged slice — REAL Eedi | **0.706 dev / 0.643 held** vs 0.48/0.40 overall → confidence IS calibrated | REAL Eedi, live | 2026-07-01 |
 | Teacher tagging time saved (headline) — REAL Eedi | **~68% dev / 56% held** auto-tagged at ~65–70% accuracy | REAL Eedi, live | 2026-07-01 |
 | Remediation efficacy (targeted vs generic) | **live gap +1.000** (targeted 2/2, generic 0/2; n=2/arm) — re-confirmed genuinely live after the max_turns fix | fixture (live learner) | 2026-07-01 |
-| QWK on ASAP free-response (optional stretch) | **live 1.000** (n=10 synthetic, perfect on a clear-cut fixture — not statistical); offline stub 0.921 | synthetic fixture | 2026-07-01 |
+| QWK on ASAP-SAS free-response (stretch) — REAL | **pooled 0.599 (n=80); mean-per-set 0.357** (8/set × 10 sets, zero-shot Haiku, generic rubrics) | REAL ASAP-SAS, live | 2026-07-01 |
 
 ## In progress
 
@@ -229,13 +229,20 @@ demo video (human).
   (`train.csv` 4,370 labeled instances + `misconception_mapping.csv` 2,587
   misconceptions) → **real diagnosis numbers measured**; `data/asap/meta.json`
   (real ASAP rubrics/prompts for all 10 sets).
-- **Still need:** ASAP **`train_rel_2.tsv`** → rename to `data/asap/train.tsv`
-  for a real QWK number (rubrics already in `data/asap/meta.json`).
-- **To finalize the submission number:** run the real Eedi benchmark at
-  n=150–300/split (this session used n=20 for an indicative live number).
+- **Have (real):** full ASAP-SAS `train_rel_2.tsv` (17,043 responses, 10 sets) at
+  `data/asap/train.tsv` + real rubrics in `data/asap/meta.json` → **real QWK
+  measured**.
+- **To finalize submission numbers:** scale the Eedi benchmark to n=150–300/split
+  and the ASAP QWK to more per set (this session: Eedi n=25/split, ASAP 8/set —
+  both indicative). All data is now in place; just costs credit/time.
 
 ## Decision Log (append-only; one line each, newest first)
 
+- _2026-07-01_ — **Real ASAP-SAS QWK measured.** Full `train_rel_2.tsv` (17,043
+  responses / 10 sets) wired; rebuilt `meta.json` with real per-set rubric scoring
+  guides from the description docs. Zero-shot Haiku grader, 8/set: pooled QWK
+  0.599 (n=80), mean-per-set 0.357 (dragged by set 8's −0.39 on n=8). Shows the
+  grader generalizes to free-response; small per-set n is noisy.
 - _2026-07-01_ — **Real Eedi, full benchmark (n=25/split, k=3).** top-1 0.480 dev /
   0.400 held; MAP@25 0.480 / 0.428; recall@25 0.520 / 0.480; auto-taggable 0.68 /
   0.56 with auto-tagged accuracy 0.706 / 0.643 (vs 0.48/0.40 overall). Two

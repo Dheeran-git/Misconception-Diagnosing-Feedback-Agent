@@ -62,7 +62,7 @@ live Opus 4.8 diagnosis + off-the-shelf MiniLM retrieval — indicative, run
 | **Retrieval recall@25** (Scalability / **the bottleneck**) | **REAL Eedi: 0.520 dev · 0.480 held-out** | share of items whose gold survives the top-25 retrieved (of 2,587) — recall≈0.5 caps top-1; diagnosis-given-retrieval ≈92% dev (`recall_at_k`) |
 | **% auto-taggable / teacher time saved** (Scalability / headline) | **REAL Eedi: 0.68 dev · 0.56 held-out**, auto-tagged accuracy **0.706 / 0.643** (vs 0.48/0.40 overall) | share with self-consistency confidence ≥ 0.7; the accuracy-on-autotagged shows the threshold is calibrated (`eval/tagging.py`, `auto_taggable_summary`) |
 | **Remediation efficacy gap** (Impact) | **+1.000** live (targeted 2/2 vs generic 0/2; n=2/arm) | resolution rate of targeted vs generic hints on a live simulated learner with a known misconception (`eval/efficacy.py`) |
-| **QWK on ASAP free-response** (optional stretch) | live **1.000** (n=10 synthetic, clear-cut — not statistical) | quadratic-weighted kappa, human Score1 vs model rubric score (`eval/asap.py`, generalization beyond MCQ) |
+| **QWK on ASAP-SAS free-response** (stretch) | **REAL: pooled 0.599 (n=80), mean-per-set 0.357** | quadratic-weighted kappa, human Score1 vs model rubric score across 10 essay sets — zero-shot Haiku baseline, shows the grader generalizes beyond MCQ (`eval/asap.py`) |
 
 ### The bottleneck is retrieval, not diagnosis (real-Eedi finding)
 

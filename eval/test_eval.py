@@ -423,9 +423,14 @@ def test_free_response_grader_stub():
 
 
 def test_asap_loader_and_qwk_pipeline():
+    from feedback_agent import config
+
     from .asap import load_asap, run_asap_grading
 
-    items = load_asap()
+    # Pin to the fixture so the suite stays fast even when real ASAP data is present.
+    items = load_asap(
+        config.FIXTURES_DIR / "asap_sample.csv", config.FIXTURES_DIR / "asap_meta.json"
+    )
     assert len(items) >= 8
     assert all(0 <= it.human_score <= it.max_score for it in items)
     res = run_asap_grading(items, force_offline=True)
