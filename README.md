@@ -54,9 +54,9 @@ Streamlit dashboard (teacher triage + student feedback) serves both users.
 | **Misconception diagnosis top-1** (Impact / primary) | 0.333 dev · 0.000 held-out *unseen* | predicted top-1 misconception == Eedi gold `MisconceptionId`, over one instance per labeled wrong distractor (`eval/metrics.py::top1_accuracy`) |
 | **MAP@25** (Eedi's own metric) | 0.590 dev · 0.300 held-out | mean 1/rank of the gold id in the ranked candidate list (`map_at_k`) |
 | **Retrieval recall@k** (Scalability) | 1.000 in-context; embedding path validated on a noised taxonomy | share of items whose gold survives the top-k retrieved candidates (`recall_at_k`) |
-| **Remediation efficacy gap** (Impact) | **+1.000** live (targeted 2/2 vs generic 0/2; n=2/arm, 1 hint) | resolution rate of targeted vs generic hints on a simulated learner with a known misconception (`eval/efficacy.py`) |
+| **Remediation efficacy gap** (Impact) | **+1.000** live (targeted 2/2 vs generic 0/2; n=2/arm) | resolution rate of targeted vs generic hints on a live simulated learner with a known misconception (`eval/efficacy.py`) |
 | **% auto-taggable / teacher time saved** (Scalability / headline) | 0.167 @ conf≥0.7 — see failure mode | share with self-consistency confidence ≥ threshold (`eval/tagging.py`, `auto_taggable_summary`) |
-| **QWK on ASAP free-response** (optional stretch) | offline-stub 0.921 (mechanism); live number pending | quadratic-weighted kappa, human Score1 vs model rubric score (`eval/asap.py`, generalization beyond MCQ) |
+| **QWK on ASAP free-response** (optional stretch) | live **1.000** (n=10 synthetic, clear-cut — not statistical) | quadratic-weighted kappa, human Score1 vs model rubric score (`eval/asap.py`, generalization beyond MCQ) |
 
 ### Honest failure mode (this is rigor, not a footnote)
 

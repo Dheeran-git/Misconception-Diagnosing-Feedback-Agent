@@ -191,8 +191,8 @@ Eedi/ASAP data + demo video (human).
 | % auto-taggable @ threshold | 0.167 (1/6) @ conf≥0.7, k=3 | fixture, live | 2026-07-01 |
 | accuracy on auto-tagged slice | **0.000** (the 1 auto-tagged item was wrong — miscalibration, see note) | fixture, live | 2026-07-01 |
 | Teacher tagging time saved (headline) | 0.167 mechanically (5/6 correctly routed to triage) — NOT a clean win on this hard subset | fixture, live | 2026-07-01 |
-| Remediation efficacy (targeted vs generic) | **live gap +1.000** (targeted 2/2 resolved, generic 0/2, both triaged; n=2/arm, 1 hint) · offline mechanism gap 1.000 | fixture (live learner) | 2026-07-01 |
-| QWK on ASAP free-response (optional stretch) | offline stub 0.921 (mechanism); live _run in progress_ | synthetic fixture | 2026-07-01 |
+| Remediation efficacy (targeted vs generic) | **live gap +1.000** (targeted 2/2, generic 0/2; n=2/arm) — re-confirmed genuinely live after the max_turns fix | fixture (live learner) | 2026-07-01 |
+| QWK on ASAP free-response (optional stretch) | **live 1.000** (n=10 synthetic, perfect on a clear-cut fixture — not statistical); offline stub 0.921 | synthetic fixture | 2026-07-01 |
 
 ## In progress
 
@@ -216,6 +216,16 @@ Eedi/ASAP data + demo video (human).
 
 ## Decision Log (append-only; one line each, newest first)
 
+- _2026-07-01_ — **Bug fix + integrity re-measure:** the live structured-output
+  calls used `max_turns=1`, which `output_format` can exceed → silent offline-stub
+  fallback. This meant the free-response grader and the live remediation/simulated-
+  learner calls (behind the efficacy number) ran as *stub*, not live. Fixed
+  (`max_turns=6`) and re-ran: ASAP QWK is genuinely live 1.000 (n=10 synthetic);
+  efficacy gap re-confirmed +1.000 genuinely live. Diagnosis path was unaffected.
+- _2026-07-01_ — FR10 stretch: rubric-aware free-response grader + ASAP QWK
+  (generalization beyond MCQ), synthetic fixture on the real ASAP schema.
+- _2026-07-01_ — Gap-closing: FR6 SymPy tool (agent calls it live), FR9 trace via
+  SDK hooks, confidence routing inside the loop, dashboard metrics panel.
 - _2026-07-01_ — Day 7: README rewritten as the writeup (metrics-first, how each
   number is computed, honest calibration failure mode, reproduce commands, demo
   runbook, AI-use disclosure). Remaining items are human-only: record the video
