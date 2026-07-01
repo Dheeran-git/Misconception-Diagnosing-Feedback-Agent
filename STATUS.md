@@ -3,7 +3,7 @@
 > Update this at the end of every session. Keep it short and current. Claude Code:
 > reflect real state here, not aspirations.
 
-**Current day:** Day 6 (Streamlit dashboard)
+**Current day:** Day 7 (writeup + demo)
 **Last updated:** 2026-07-01
 **Core-complete (Day 4 loop runs end-to-end)?** ✅ YES — assess→diagnose→remediate→verify→escalate→triage runs end-to-end (offline-deterministic + live seam)
 
@@ -120,6 +120,17 @@ ASSESS step + grade cache instead. QWK scaffolding is in place for the stretch.
 - [ ] Optional active-diagnosis flourish: **cut** (PLAN.md says cut if it risks
       the demo; not worth the hours vs. finishing).
 
+## Day-7 deliverables (this session)
+
+- [x] `README.md` rewritten as the writeup: leads with the metrics table + **how
+      each number is computed**, the held-out unseen split, the honest calibration
+      failure mode, exact reproduce commands, a 2–3 min demo runbook, and an
+      **AI-use disclosure**.
+- [ ] Record the 2–3 min demo video (human — headline number in first 10s, live
+      loop on one example, teacher triage view).
+- [ ] Drop real Eedi CSVs into `data/` to convert fixture numbers → reportable
+      Eedi numbers (human — needs Kaggle access).
+
 ## Current metrics (fill as they exist; "—" until measured)
 
 > ⚠️ Numbers below are on the **synthetic fixture** (8 questions / 6 invented
@@ -176,6 +187,10 @@ ASSESS step + grade cache instead. QWK scaffolding is in place for the stretch.
 
 ## Decision Log (append-only; one line each, newest first)
 
+- _2026-07-01_ — Day 7: README rewritten as the writeup (metrics-first, how each
+  number is computed, honest calibration failure mode, reproduce commands, demo
+  runbook, AI-use disclosure). Remaining items are human-only: record the video
+  and drop real Eedi CSVs into `data/`. Per PLAN, stop building.
 - _2026-07-01_ — Day 6: thin Streamlit dashboard (teacher triage + student
   feedback), importing the agent library directly (no HTTP). Pure data helpers
   split out for unit-testing; rendering guarded under `__main__`. Active-diagnosis
@@ -222,6 +237,6 @@ ASSESS step + grade cache instead. QWK scaffolding is in place for the stretch.
 - [ ] Headline number lands in first 10s of video
 - [x] Live loop runs end-to-end on one example (needs the demo UI on Day 6)
 - [x] Teacher triage view shown (Streamlit; serves headless, reads live queue)
-- [ ] README documents how every number is computed
-- [ ] AI-use disclosure added if rules require it
+- [x] README documents how every number is computed (+ reproduce commands)
+- [x] AI-use disclosure added
 - [ ] Submitted before deadline
