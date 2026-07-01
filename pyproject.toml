@@ -9,13 +9,13 @@ dependencies = [
     "pandas",
     "scikit-learn",
     "pydantic>=2",
+    "sentence-transformers>=5.6.0",
+    "chromadb>=1.5.9",
 ]
 
-# Heavier / later-day deps are intentionally NOT installed yet (conserve setup,
-# add on the day they're needed):
-#   sentence-transformers, chromadb  -> Day 3 (retrieval)
-#   sympy                            -> Day 4 (math_check tool)
-#   streamlit                        -> Day 6 (dashboard)
+# Later-day deps, added on the day they're needed:
+#   sympy      -> Day 4 (math_check tool)
+#   streamlit  -> Day 6 (dashboard)
 
 [dependency-groups]
 dev = [

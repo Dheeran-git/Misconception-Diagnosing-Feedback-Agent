@@ -1,9 +1,13 @@
-"""Misconception taxonomy: load Eedi's misconception_mapping.csv + candidate seam.
+"""Misconception taxonomy: load Eedi's misconception_mapping.csv + retrieval.
 
 Eedi ships ``misconception_mapping.csv`` (MisconceptionId -> MisconceptionName),
-which IS the expert taxonomy. Day 1 keeps the retrieval **seam** but not real
-retrieval: ``candidates_for`` returns the full taxonomy (optionally capped). Day 3
-swaps the body for sentence-transformers + Chroma without changing this signature.
+which IS the expert taxonomy. ``load_mapping`` reads it. The retrieval seam lives
+in ``retrieval.py`` (Day 3): ``build_retriever`` returns an in-context retriever
+for small taxonomies and a sentence-transformers + Chroma one for large ones.
+
+``candidates_for`` is a convenience wrapper for the in-context path. Unlike the
+Day-1 version it is **blind to the gold label** (no gold-peeking), so eval numbers
+reflect real retrieval, not a rigged candidate list.
 """
 from __future__ import annotations
 
@@ -12,6 +16,21 @@ from pathlib import Path
 import pandas as pd
 
 from ..models import DiagnosisItem
+from .retrieval import (
+    EmbeddingRetriever,
+    InContextRetriever,
+    Retriever,
+    build_retriever,
+)
+
+__all__ = [
+    "load_mapping",
+    "candidates_for",
+    "build_retriever",
+    "Retriever",
+    "InContextRetriever",
+    "EmbeddingRetriever",
+]
 
 
 def load_mapping(path: Path) -> dict[str, str]:
@@ -31,20 +50,13 @@ def candidates_for(
     *,
     limit: int | None = None,
 ) -> list[tuple[str, str]]:
-    """Return candidate (id, name) pairs for an item.
+    """In-context candidates for an item (blind to the gold label).
 
-    Day 1: the full taxonomy (retrieval seam is here but a no-op). The gold id is
-    guaranteed present so scoring is well-defined. ``limit`` caps the list for
-    large real taxonomies; the gold id is always retained.
+    Convenience over ``InContextRetriever``: returns the taxonomy capped to
+    ``limit`` (order-preserving, no gold-peeking). For real retrieval on a large
+    taxonomy use ``build_retriever(...)`` / ``EmbeddingRetriever``.
     """
-    items = list(mapping.items())
-    if limit is not None and len(items) > limit:
-        gold = item.gold_misconception_id
-        kept = [(cid, name) for cid, name in items if cid != gold][: max(0, limit - 1)]
-        if gold in mapping:
-            kept.append((gold, mapping[gold]))
-        return kept
-    return items
+    return InContextRetriever(mapping).candidates(item, k=limit)
 
 
 def _pick(columns, candidates: list[str]) -> str:

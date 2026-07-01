@@ -38,6 +38,16 @@ FAST_MODEL: str = _get("FAST_MODEL", "claude-haiku-4-5-20251001")
 # --- Offline switch: when set, never call the live SDK (deterministic + free). ---
 OFFLINE: bool = _get("FEEDBACK_AGENT_OFFLINE", "0").lower() in {"1", "true", "yes"}
 
+# --- Retrieval (Day 3) ---
+# 'auto' picks in-context for a small taxonomy, embeddings for a large one.
+RETRIEVER: str = _get("RETRIEVER", "auto")          # auto | incontext | embedding
+# Taxonomies at or below this size fit in context; above it we embed + retrieve.
+RETRIEVAL_INCONTEXT_MAX: int = int(_get("RETRIEVAL_INCONTEXT_MAX", "200"))
+RETRIEVAL_K: int = int(_get("RETRIEVAL_K", "25"))   # candidates fed to the diagnoser
+EMBED_MODEL: str = _get("EMBED_MODEL", "all-MiniLM-L6-v2")
+# Persistent Chroma dir (gitignored). None -> ephemeral in-memory client.
+CHROMA_DIR: Path = REPO_ROOT / ".chroma"
+
 # Where real Eedi data lives (gitignored); harness falls back to eval/fixtures/.
 DATA_DIR: Path = REPO_ROOT / "data"
 FIXTURES_DIR: Path = REPO_ROOT / "eval" / "fixtures"

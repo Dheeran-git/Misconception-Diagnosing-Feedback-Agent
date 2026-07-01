@@ -3,9 +3,9 @@
 > Update this at the end of every session. Keep it short and current. Claude Code:
 > reflect real state here, not aspirations.
 
-**Current day:** Day 2 (ASSESS step + cache)
+**Current day:** Day 3 (diagnosis: retrieval + improved prompt)
 **Last updated:** 2026-07-01
-**Core-complete (Day 4 loop runs end-to-end)?** ❌ not yet (ASSESS + DIAGNOSE built; remediate/verify/escalate pending)
+**Core-complete (Day 4 loop runs end-to-end)?** ❌ not yet (ASSESS + DIAGNOSE + retrieval built; remediate/verify/escalate pending)
 
 ## Day-0 checklist
 
@@ -54,6 +54,26 @@ stretch, which the Decision Log already demoted to optional. On the Eedi MCQ
 spine, ASSESS is deterministic (no QWK to move), so Day 2 built the on-spine
 ASSESS step + grade cache instead. QWK scaffolding is in place for the stretch.
 
+## Day-3 deliverables (this session)
+
+- [x] Retrieval seam (`src/feedback_agent/taxonomy/retrieval.py`): `Retriever`
+      protocol + `InContextRetriever` (small taxonomy) + `EmbeddingRetriever`
+      (sentence-transformers + Chroma, the locked stack). `build_retriever` auto-
+      selects by taxonomy size (`RETRIEVAL_INCONTEXT_MAX`, default 200).
+- [x] **Embedding retriever validated** (real model): on a noised 14-item
+      taxonomy it retrieves top-6 by cosine, the gold misconception survives, and
+      unrelated-topic misconceptions are filtered out. This is the scalability
+      path for real Eedi (~2.5k misconceptions). Chroma fed vectors directly, so
+      no Chroma-side model download (their CDN is 403 here).
+- [x] Retrieval is **blind to the gold label** (removed Day-1 gold-peeking);
+      `recall@k` metric added (`eval/metrics.py`) to report the retrieval ceiling.
+- [x] Diagnosis prompt **v2** (`prompts/diagnose_v2.md`): explicit work-backwards
+      reasoning (a misconception must *reproduce* the chosen distractor) + one
+      generic worked example (NOT from the fixture — no teaching-to-the-test).
+      Prompt version bump invalidates the v1 cache by design.
+- [x] Harness builds the retriever once and reports `recall@k`. Tests: 15 green +
+      1 gated embedding test (run with `FEEDBACK_AGENT_RUN_EMBED=1`). Lint clean.
+
 ## Current metrics (fill as they exist; "—" until measured)
 
 > ⚠️ Numbers below are on the **synthetic fixture** (8 questions / 6 invented
@@ -62,8 +82,9 @@ ASSESS step + grade cache instead. QWK scaffolding is in place for the stretch.
 
 | Metric | Value | Split | Date |
 |---|---|---|---|
-| Misconception diagnosis accuracy — top-1 (PRIMARY) | 0.333 (dev) / 0.000 (heldout-unseen) | fixture, live Opus 4.8 | 2026-07-01 |
-| Misconception MAP@k (k=25) | 0.558 (dev) / 0.321 (heldout-unseen) | fixture, live Opus 4.8 | 2026-07-01 |
+| Misconception diagnosis accuracy — top-1 (PRIMARY) | v1: 0.333 dev / 0.000 held · v2: _live run in progress_ | fixture, live Opus 4.8 | 2026-07-01 |
+| Misconception MAP@k (k=25) | v1: 0.558 dev / 0.321 held · v2: _live run in progress_ | fixture, live Opus 4.8 | 2026-07-01 |
+| Retrieval recall@k (retrieval ceiling) | 1.000 (in-context, small taxonomy); embedding path validated | fixture | 2026-07-01 |
 | — offline-stub baseline (pipeline smoke) | top1 0.00 / MAP@25 0.35 | dev (fixture) | 2026-07-01 |
 | % auto-taggable @ threshold | — | | |
 | Teacher tagging time saved (headline) | — | | |
@@ -78,11 +99,13 @@ ASSESS step + grade cache instead. QWK scaffolding is in place for the stretch.
 
 ## Next up
 
-- Day 3: proper diagnosis — misconception taxonomy retrieval seam
-  (sentence-transformers + Chroma, or in-context if small) narrowing candidates,
-  improved diagnosis prompt; target beating the Day-1 baseline top-1/MAP.
+- **Day 4 (CORE COMPLETE target):** `remediation.py` (Socratic hint, no
+  answer-leak guardrail), verify/escalate logic in `agent.py`, and
+  `eval/simulated_learner.py`. Full loop runs end-to-end + remediation-efficacy
+  number (targeted vs generic). Commit as the safe working baseline.
 - When Eedi CSVs arrive: drop `train.csv` + `misconception_mapping.csv` into
-  `data/`, re-run `pytest` / harness — loader auto-prefers `data/`.
+  `data/`, re-run `pytest` / harness — loader auto-prefers `data/`. On the real
+  ~2.5k taxonomy, `build_retriever` auto-switches to the embedding path.
 
 ## Blockers
 
@@ -91,6 +114,12 @@ ASSESS step + grade cache instead. QWK scaffolding is in place for the stretch.
 
 ## Decision Log (append-only; one line each, newest first)
 
+- _2026-07-01_ — Day 3: retrieval seam = `InContextRetriever` (small taxonomy) +
+  `EmbeddingRetriever` (sentence-transformers + Chroma), auto-selected by size.
+  Retrieval made **blind to gold** (dropped Day-1 gold-peeking) + added `recall@k`
+  so numbers reflect real retrieval. Diagnosis prompt bumped to v2 (work-backwards
+  reasoning + generic example). Fixture (6 misconceptions) can't show retrieval
+  narrowing, so the embedding path was validated on a noised synthetic taxonomy.
 - _2026-07-01_ — Day 2 built the on-spine **ASSESS** step (MCQ correctness →
   `AssessResult`) + grade cache + attempts log, NOT PLAN.md's literal "rubric
   grading + QWK". Reason: QWK/rubric grading is free-response (ASAP), already

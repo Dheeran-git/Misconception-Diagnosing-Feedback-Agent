@@ -11,6 +11,7 @@ same cache, and these tests then read the real predictions from disk.
 """
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
@@ -127,6 +128,80 @@ def test_assess_choice_uses_item_correct_answer(dataset):
     # picking the item's correct option is correct; picking the distractor is not
     assert assess_choice(item, item.correct_answer).is_correct is True
     assert assess_choice(item, item.chosen_answer).is_correct is False
+
+
+def test_recall_at_k_metric():
+    from .metrics import recall_at_k
+
+    cands = [["a", "b", "c"], ["x", "y"]]
+    assert recall_at_k(cands, ["b", "z"]) == pytest.approx(0.5)
+    assert recall_at_k(cands, ["a", "x"]) == pytest.approx(1.0)
+
+
+def test_incontext_retriever_is_blind_and_capped(dataset):
+    from feedback_agent.taxonomy import InContextRetriever, build_retriever
+
+    item = dataset.items[0]
+    r = build_retriever(dataset.mapping)  # small taxonomy -> in-context
+    assert isinstance(r, InContextRetriever)
+    all_c = r.candidates(item)
+    assert len(all_c) == len(dataset.mapping)
+    # capping must NOT special-case the gold (blind retrieval)
+    capped_ids = [cid for cid, _ in r.candidates(item, k=2)]
+    assert len(capped_ids) == 2
+    assert capped_ids == list(dataset.mapping.keys())[:2]
+
+
+def test_build_retriever_selects_by_size(dataset):
+    from feedback_agent.taxonomy import InContextRetriever, build_retriever
+
+    assert isinstance(build_retriever(dataset.mapping, kind="incontext"), InContextRetriever)
+    # 'auto' on the tiny fixture stays in-context (no model download in tests)
+    assert isinstance(build_retriever(dataset.mapping, kind="auto"), InContextRetriever)
+
+
+def test_harness_reports_recall(dataset, db):
+    dev, _ = unseen_misconception_split(dataset, seed=13)
+    r = harness.run(dev, dataset.mapping, conn=db, force_offline=True)
+    # in-context retriever returns the whole (small) taxonomy -> gold always present
+    key = next(k for k in r.metrics if k.startswith("recall@"))
+    assert r.metrics[key] == pytest.approx(1.0)
+
+
+@pytest.mark.skipif(
+    os.getenv("FEEDBACK_AGENT_RUN_EMBED") != "1",
+    reason="embedding retriever downloads a model + needs network; set FEEDBACK_AGENT_RUN_EMBED=1",
+)
+def test_embedding_retriever_narrows_large_taxonomy(dataset):
+    from feedback_agent.taxonomy import EmbeddingRetriever
+
+    # 6 real linear-equation misconceptions + noise on unrelated topics
+    mapping = dict(dataset.mapping)
+    noise = {
+        f"n{i}": name
+        for i, name in enumerate(
+            [
+                "Confuses the area and perimeter of a rectangle",
+                "Believes the mean is the middle value of a sorted list",
+                "Thinks probability can exceed 1",
+                "Rounds to the nearest ten instead of the nearest whole number",
+                "Confuses acute and obtuse angles",
+                "Believes multiplying two negatives gives a negative",
+                "Thinks a fraction is larger when its denominator is larger",
+                "Confuses radius and diameter of a circle",
+            ],
+            start=1,
+        )
+    }
+    mapping.update(noise)
+
+    r = EmbeddingRetriever(mapping)
+    item = next(it for it in dataset.items if it.gold_misconception_id in dataset.mapping)
+    top = [cid for cid, _ in r.candidates(item, k=6)]
+    assert len(top) == 6
+    assert item.gold_misconception_id in top  # gold survives retrieval
+    # at least one obviously-unrelated noise id is filtered out
+    assert any(cid not in top for cid in noise)
 
 
 def test_qwk_metric():

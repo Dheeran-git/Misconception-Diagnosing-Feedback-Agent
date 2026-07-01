@@ -10,6 +10,17 @@ Definitions (see EVAL.md):
 from __future__ import annotations
 
 
+def recall_at_k(candidate_id_lists: list[list[str]], gold: list[str]) -> float:
+    """Retrieval ceiling: fraction of items whose gold misconception survives into
+    the retrieved candidate list. If the gold isn't retrieved, the diagnoser can
+    never pick it — so this bounds top-1/MAP from above.
+    """
+    if not gold:
+        return 0.0
+    hits = sum(1 for cands, g in zip(candidate_id_lists, gold, strict=True) if g in cands)
+    return hits / len(gold)
+
+
 def qwk(human: list[int], model: list[int]) -> float:
     """Quadratic-weighted Cohen's kappa — the ASAP-SAS free-response agreement
     metric (EVAL.md, optional stretch). Not used on the Eedi MCQ spine; provided

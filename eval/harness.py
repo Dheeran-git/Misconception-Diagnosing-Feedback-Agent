@@ -11,10 +11,10 @@ import sqlite3
 from collections import Counter
 from dataclasses import dataclass, field
 
-from feedback_agent import state
+from feedback_agent import config, state
 from feedback_agent.diagnosis import diagnose_baseline
 from feedback_agent.models import DiagnosisItem
-from feedback_agent.taxonomy import candidates_for
+from feedback_agent.taxonomy import Retriever, build_retriever
 
 from . import metrics as M
 
@@ -32,28 +32,37 @@ def run(
     *,
     conn: sqlite3.Connection | None = None,
     force_offline: bool = False,
-    candidate_limit: int | None = None,
-    k: int = 25,
+    retriever: Retriever | None = None,
+    k: int | None = None,
     split_name: str = "",
 ) -> RunResult:
+    """Diagnose each item and score. Retrieval narrows the taxonomy to top-k
+    candidates (blind to gold); ``recall@k`` reports how often the gold survives.
+    """
     own_conn = conn is None
     if conn is None:
         conn = state.connect()
+    if retriever is None:
+        retriever = build_retriever(mapping)
+    k = k if k is not None else config.RETRIEVAL_K
 
     preds: list[str | None] = []
     ranked_lists: list[list[str]] = []
+    candidate_id_lists: list[list[str]] = []
     gold: list[str] = []
     modes: Counter = Counter()
     records: list[dict] = []
 
     try:
         for item in items:
-            candidates = candidates_for(item, mapping, limit=candidate_limit)
+            candidates = retriever.candidates(item, k=k)
+            candidate_ids = [cid for cid, _ in candidates]
             diagnosis, mode = diagnose_baseline(
                 item, candidates, conn=conn, force_offline=force_offline
             )
             preds.append(diagnosis.misconception_id)
             ranked_lists.append(diagnosis.ranked_misconception_ids)
+            candidate_id_lists.append(candidate_ids)
             gold.append(item.gold_misconception_id)
             modes[mode] += 1
             records.append(
@@ -62,6 +71,7 @@ def run(
                     "gold": item.gold_misconception_id,
                     "pred": diagnosis.misconception_id,
                     "correct": diagnosis.misconception_id == item.gold_misconception_id,
+                    "retrieved": item.gold_misconception_id in candidate_ids,
                     "mode": mode,
                 }
             )
@@ -70,5 +80,6 @@ def run(
             conn.close()
 
     summary = M.summarize(preds, ranked_lists, gold, k=k)
+    summary[f"recall@{k}"] = M.recall_at_k(candidate_id_lists, gold)
     _ = split_name  # reserved for labeled reporting
     return RunResult(metrics=summary, modes=modes, records=records)
