@@ -26,7 +26,7 @@ def check_no_api_key() -> None:
 
 async def run_query() -> str:
     try:
-        from claude_agent_sdk import query, ClaudeAgentOptions
+        from claude_agent_sdk import ClaudeAgentOptions, query
     except ImportError:
         print("FAIL: claude_agent_sdk not installed.")
         print("      Run: uv add claude-agent-sdk   (or: pip install claude-agent-sdk)")
@@ -41,7 +41,7 @@ async def run_query() -> str:
         options=ClaudeAgentOptions(allowed_tools=[]),
     ):
         # The SDK's terminal message exposes `.result` (per docs examples).
-        if hasattr(message, "result") and getattr(message, "result"):
+        if hasattr(message, "result") and message.result:
             result_text = str(message.result)
     return result_text
 
