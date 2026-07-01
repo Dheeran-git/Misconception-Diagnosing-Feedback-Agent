@@ -186,7 +186,7 @@ Eedi/ASAP data + demo video (human).
 |---|---|---|---|
 | Misconception diagnosis accuracy — top-1 (PRIMARY) | v2: 0.333 dev / 0.000 held (v1 identical) | fixture, live Opus 4.8 | 2026-07-01 |
 | Misconception MAP@k (k=25) | v2: 0.590 dev / 0.300 held (v1: 0.558 / 0.321) | fixture, live Opus 4.8 | 2026-07-01 |
-| Retrieval recall@k (retrieval ceiling) | 1.000 (in-context, small taxonomy); embedding path validated | fixture | 2026-07-01 |
+| Retrieval recall@k (retrieval ceiling) | 1.000 (in-context, small taxonomy); **embedding retrieval validated on the REAL 2,587-misconception Eedi taxonomy** — top-5 on-topic for probe queries | fixture + real taxonomy | 2026-07-01 |
 | — offline-stub baseline (pipeline smoke) | top1 0.00 / MAP@25 0.35 | dev (fixture) | 2026-07-01 |
 | % auto-taggable @ threshold | 0.167 (1/6) @ conf≥0.7, k=3 | fixture, live | 2026-07-01 |
 | accuracy on auto-tagged slice | **0.000** (the 1 auto-tagged item was wrong — miscalibration, see note) | fixture, live | 2026-07-01 |
@@ -209,10 +209,18 @@ Eedi/ASAP data + demo video (human).
   `data/`, re-run `pytest` / harness — loader auto-prefers `data/`. On the real
   ~2.5k taxonomy, `build_retriever` auto-switches to the embedding path.
 
-## Blockers
+## Blockers / data status
 
-- **Eedi dataset not yet in the environment** (no Kaggle CLI/creds). Using the
-  EVAL.md-sanctioned synthetic fixture in the meantime. Not blocking the harness.
+- **Have (real, in `data/`, gitignored):** Eedi `misconception_mapping.csv`
+  (2,587 misconceptions) → embedding retrieval validated at real scale;
+  `data/asap/meta.json` (real ASAP rubrics/prompts for all 10 sets).
+- **Still need for headline numbers:**
+  - Eedi **`train.csv`** — questions + per-distractor gold `MisconceptionId`.
+    This is the file the diagnosis-accuracy / MAP@25 numbers require. Drop into
+    `data/` (mapping already there) → `load_dataset` auto-uses real Eedi.
+  - ASAP **`train_rel_2.tsv`** → rename to `data/asap/train.tsv` for real QWK
+    (rubrics already in `data/asap/meta.json`).
+- Until those two files arrive, headline numbers remain on the synthetic fixture.
 
 ## Decision Log (append-only; one line each, newest first)
 
