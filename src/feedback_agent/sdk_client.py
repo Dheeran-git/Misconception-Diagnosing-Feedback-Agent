@@ -132,7 +132,7 @@ async def _live_json_async(prompt: str, schema: dict, *, model: str, system_prom
         model=model,
         system_prompt=system_prompt,
         allowed_tools=[],
-        max_turns=1,
+        max_turns=6,  # structured output can need an extra turn to emit the result
         output_format={"type": "json_schema", "schema": schema},
     )
     structured, text = await _collect(prompt, options)
@@ -192,7 +192,7 @@ async def _live_diagnose_async(
         model=model,
         system_prompt="You are an expert mathematics teacher who diagnoses student misconceptions.",
         allowed_tools=[],
-        max_turns=1,
+        max_turns=6,  # structured output can need an extra turn to emit the result
         output_format={"type": "json_schema", "schema": schema},
     )
     structured, text_result = await _collect(prompt, options)
