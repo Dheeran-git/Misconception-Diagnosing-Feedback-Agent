@@ -140,9 +140,14 @@ Closed the four buildable gaps from the PRD audit:
 - [x] Tests: 28 green + 1 gated (added SymPy equivalence, trace JSONL, loop
       trace+low-confidence-triage). Lint clean.
 
-Still deliberately open: ASAP/QWK free-response (optional stretch, scaffolded not
-run); hand-verify ~10 grades vs gold (do on real Eedi); real Eedi data + demo
-video (human).
+- [x] **FR10 ASAP-SAS free-response stretch** — `grading.grade_free_response`
+      (rubric-aware, 0–max_score, stub + live seam) + `eval/asap.py` loader (real
+      ASAP schema, synthetic fixture fallback) + **QWK** (quadratic-weighted
+      kappa) over human Score1 vs model score. Shows the grader generalizes beyond
+      MCQ math to another domain.
+
+Still deliberately open: hand-verify ~10 grades vs gold (do on real Eedi); real
+Eedi/ASAP data + demo video (human).
 
 ## Day-7 deliverables (this session)
 
@@ -187,7 +192,7 @@ video (human).
 | accuracy on auto-tagged slice | **0.000** (the 1 auto-tagged item was wrong — miscalibration, see note) | fixture, live | 2026-07-01 |
 | Teacher tagging time saved (headline) | 0.167 mechanically (5/6 correctly routed to triage) — NOT a clean win on this hard subset | fixture, live | 2026-07-01 |
 | Remediation efficacy (targeted vs generic) | **live gap +1.000** (targeted 2/2 resolved, generic 0/2, both triaged; n=2/arm, 1 hint) · offline mechanism gap 1.000 | fixture (live learner) | 2026-07-01 |
-| QWK on ASAP free-response (optional stretch) | — | | |
+| QWK on ASAP free-response (optional stretch) | offline stub 0.921 (mechanism); live _run in progress_ | synthetic fixture | 2026-07-01 |
 
 ## In progress
 

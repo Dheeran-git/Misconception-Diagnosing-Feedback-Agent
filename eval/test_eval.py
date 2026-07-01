@@ -402,6 +402,32 @@ def test_loop_writes_trace_and_low_confidence_triages(dataset, db, tmp_path, mon
     assert "diagnose" in steps and "triage" in steps
 
 
+def test_free_response_grader_stub():
+    from feedback_agent.grading import grade_free_response
+
+    rubric = "3 = explains photosynthesis: chlorophyll converts sunlight into glucose energy."
+    strong = "Photosynthesis uses chlorophyll to convert sunlight into glucose and energy."
+    weak = "Plants are green."
+    q = "Why do plants need sunlight?"
+    g_strong, _ = grade_free_response(q, rubric, strong, force_offline=True)
+    g_weak, _ = grade_free_response(q, rubric, weak, force_offline=True)
+    assert 0 <= g_weak.score <= 3 and 0 <= g_strong.score <= 3
+    assert g_strong.score > g_weak.score  # better answer scores higher
+
+
+def test_asap_loader_and_qwk_pipeline():
+    from .asap import load_asap, run_asap_grading
+
+    items = load_asap()
+    assert len(items) >= 8
+    assert all(0 <= it.human_score <= it.max_score for it in items)
+    res = run_asap_grading(items, force_offline=True)
+    assert res["n"] == len(items)
+    assert -1.0 <= res["qwk"] <= 1.0
+    # the deterministic stub tracks the rubric, so agreement should be positive
+    assert res["qwk"] > 0.0
+
+
 def test_dashboard_helpers_offline(dataset, db):
     # Import the Streamlit app module (must not require a running Streamlit) and
     # exercise its pure helpers offline.

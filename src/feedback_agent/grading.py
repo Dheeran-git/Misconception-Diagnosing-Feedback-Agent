@@ -14,10 +14,13 @@ MCQ letters.
 """
 from __future__ import annotations
 
+import re
 import sqlite3
 
-from . import state
-from .models import AssessResult, DiagnosisItem
+from . import config, state
+from .models import AssessResult, DiagnosisItem, GradeResult
+from .prompts import GRADE_FREE_RESPONSE_VERSION, load_prompt
+from .sdk_client import live_json
 
 # Version tag for the ASSESS logic; part of the grade_cache key. Bump if the
 # assess rule changes (e.g. when free-response model grading is added).
@@ -126,3 +129,63 @@ def assess_cached(
             chosen_answer=result.chosen_answer,
         )
     return result, "computed"
+
+
+# --------------------------------------------------------------------------- #
+# FR10 (optional stretch): rubric-aware free-response grading (ASAP-SAS)
+# --------------------------------------------------------------------------- #
+_WORD = re.compile(r"[a-z]+")
+
+
+def _rubric_keywords(rubric: str) -> set[str]:
+    # content words from the rubric, minus obvious stopwords
+    stop = {"the", "and", "for", "with", "that", "score", "point", "points",
+            "answer", "student", "response", "rubric", "gives", "give", "one", "two"}
+    return {w for w in _WORD.findall(rubric.lower()) if len(w) > 3 and w not in stop}
+
+
+def _stub_grade(answer_text: str, rubric: str, max_score: int) -> GradeResult:
+    """Deterministic offline grade: scale rubric-keyword coverage to 0..max_score.
+    A mechanism for testing the QWK pipeline offline, NOT the reported grader."""
+    keys = _rubric_keywords(rubric)
+    ans = {w for w in _WORD.findall(answer_text.lower())}
+    hits = len(keys & ans)
+    denom = max(1, min(len(keys), 4))
+    score = round(max_score * min(1.0, hits / denom))
+    return GradeResult(score=int(score), max_score=max_score,
+                       reasoning="(offline stub: rubric-keyword coverage)")
+
+
+def grade_free_response(
+    question_text: str,
+    rubric: str,
+    answer_text: str,
+    *,
+    max_score: int = 3,
+    model: str | None = None,
+    force_offline: bool = False,
+) -> tuple[GradeResult, str]:
+    """Return (GradeResult, mode). Rubric-aware short-answer grader used only for
+    the ASAP-SAS generalization demo (the MCQ spine doesn't need it)."""
+    model = model or config.FAST_MODEL
+    if force_offline or config.OFFLINE:
+        return _stub_grade(answer_text, rubric, max_score), "offline"
+    prompt = load_prompt(GRADE_FREE_RESPONSE_VERSION).format(
+        question_text=question_text, rubric=rubric, answer_text=answer_text, max_score=max_score
+    )
+    try:
+        data = live_json(
+            prompt, GradeResult.model_json_schema(), model=model,
+            system_prompt="You are a strict, consistent rubric grader.",
+        )
+        raw = int(data.get("score", 0))
+        return (
+            GradeResult(
+                score=max(0, min(max_score, raw)),
+                max_score=max_score,
+                reasoning=str(data.get("reasoning", "")),
+            ),
+            "live",
+        )
+    except Exception:
+        return _stub_grade(answer_text, rubric, max_score), "offline"

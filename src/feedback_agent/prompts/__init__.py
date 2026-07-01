@@ -22,6 +22,9 @@ REMEDIATE_GENERIC_VERSION = "remediate_generic_v1"
 # Simulated-learner prompt (Day 4).
 LEARNER_PROMPT_VERSION = "learner_v1"
 
+# Rubric-aware free-response grader (FR10 optional stretch — ASAP-SAS).
+GRADE_FREE_RESPONSE_VERSION = "grade_free_response_v1"
+
 
 def load_prompt(version: str) -> str:
     """Return the raw template text for a prompt version (e.g. 'diagnose_v1')."""

@@ -77,6 +77,19 @@ class Intervention(BaseModel):
     leaked_answer: bool = False
 
 
+class GradeResult(BaseModel):
+    """FR10 (optional stretch): a rubric-aware score for a free-response answer.
+
+    Used only for the ASAP-SAS generalization demo — the MCQ spine does not need
+    it. ``score`` is on a 0..``max_score`` rubric scale (ASAP uses 0–3).
+    """
+
+    score: int
+    max_score: int = 3
+    reasoning: str = ""
+    per_criterion: dict[str, int] | None = None
+
+
 class LearnerAttempt(BaseModel):
     """A simulated learner's answer on an attempt.
 
