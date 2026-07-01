@@ -346,6 +346,22 @@ def test_tagging_pipeline_offline(dataset, db):
     assert 0.0 <= m["accuracy_on_autotagged"] <= 1.0
 
 
+def test_dashboard_helpers_offline(dataset, db):
+    # Import the Streamlit app module (must not require a running Streamlit) and
+    # exercise its pure helpers offline.
+    from app import dashboard
+
+    # a wrong-answer instance -> student feedback returns a diagnosis + hint, no leak
+    item = dataset.items[0]
+    res = dashboard.student_feedback(item, dataset.mapping, conn=db, force_offline=True)
+    assert res["is_correct"] is False
+    assert res["diagnosis"] is not None and res["intervention"] is not None
+    assert res["leaked"] is False
+
+    # triage rows helper returns a list (empty on a fresh DB)
+    assert dashboard.triage_rows(db) == []
+
+
 def test_diagnosis_item_shape():
     it = DiagnosisItem(
         question_id="q_A",

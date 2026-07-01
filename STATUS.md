@@ -3,7 +3,7 @@
 > Update this at the end of every session. Keep it short and current. Claude Code:
 > reflect real state here, not aspirations.
 
-**Current day:** Day 5 (confidence + triage + scalability number)
+**Current day:** Day 6 (Streamlit dashboard)
 **Last updated:** 2026-07-01
 **Core-complete (Day 4 loop runs end-to-end)?** ✅ YES — assess→diagnose→remediate→verify→escalate→triage runs end-to-end (offline-deterministic + live seam)
 
@@ -106,6 +106,20 @@ ASSESS step + grade cache instead. QWK scaffolding is in place for the stretch.
 - [x] Tests: 24 green + 1 gated (agreement math, triage threshold, auto-taggable
       math, k-sample confidence, tagging pipeline). Lint clean.
 
+## Day-6 deliverables (this session)
+
+- [x] `app/dashboard.py` — thin Streamlit app, **imports the same agent modules
+      as the eval harness** (no HTTP layer). Two views:
+  - **Student feedback:** pick a question+answer → assess → diagnose → targeted
+    Socratic hint (with the guardrail flag), no answer revealed.
+  - **Teacher triage:** the low-confidence queue from SQLite, most-uncertain
+    first, with confidence flags 🔴/🟢, predicted misconception + evidence.
+  - Sidebar "offline (fast)" toggle to demo without spending credit.
+- [x] Verified: launches headless and serves HTTP 200; pure helpers unit-tested
+      offline (25 tests green). Lint clean.
+- [ ] Optional active-diagnosis flourish: **cut** (PLAN.md says cut if it risks
+      the demo; not worth the hours vs. finishing).
+
 ## Current metrics (fill as they exist; "—" until measured)
 
 > ⚠️ Numbers below are on the **synthetic fixture** (8 questions / 6 invented
@@ -148,9 +162,9 @@ ASSESS step + grade cache instead. QWK scaffolding is in place for the stretch.
 
 ## Next up
 
-- **Day 6:** Streamlit `app/dashboard.py` — teacher triage view (queue +
-  confidence flags + metrics) and student feedback view. Thin and legible; both
-  import the same agent module (no HTTP layer).
+- **Day 7:** demo (2–3 min, headline number first 10s), writeup/README leading
+  with metrics + how each is computed (held-out split, unseen handling), AI-use
+  disclosure if required. Stop building.
 - When Eedi CSVs arrive: drop `train.csv` + `misconception_mapping.csv` into
   `data/`, re-run `pytest` / harness — loader auto-prefers `data/`. On the real
   ~2.5k taxonomy, `build_retriever` auto-switches to the embedding path.
@@ -162,6 +176,10 @@ ASSESS step + grade cache instead. QWK scaffolding is in place for the stretch.
 
 ## Decision Log (append-only; one line each, newest first)
 
+- _2026-07-01_ — Day 6: thin Streamlit dashboard (teacher triage + student
+  feedback), importing the agent library directly (no HTTP). Pure data helpers
+  split out for unit-testing; rendering guarded under `__main__`. Active-diagnosis
+  flourish cut (scope discipline; finishing > cleverness).
 - _2026-07-01_ — Day 5: confidence via self-consistency over k *candidate-order-
   shuffled* diagnosis samples (the SDK exposes no temperature knob, so we perturb
   ordering instead). Confidence-based triage lives in the batch tagging pipeline
@@ -203,7 +221,7 @@ ASSESS step + grade cache instead. QWK scaffolding is in place for the stretch.
 
 - [ ] Headline number lands in first 10s of video
 - [x] Live loop runs end-to-end on one example (needs the demo UI on Day 6)
-- [ ] Teacher triage view shown
+- [x] Teacher triage view shown (Streamlit; serves headless, reads live queue)
 - [ ] README documents how every number is computed
 - [ ] AI-use disclosure added if rules require it
 - [ ] Submitted before deadline
