@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.uv/
+*.egg-info/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Data & cache (do not commit datasets or the grade cache)
+data/
+*.sqlite
+*.sqlite3
+
+# Eval artifacts / traces / logs
+eval/datasets/
+traces/
+*.log
+
+# Chroma local store
+.chroma/
+chroma/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
