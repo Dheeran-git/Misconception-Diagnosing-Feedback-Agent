@@ -162,9 +162,16 @@ Eedi/ASAP data + demo video (human).
 
 ## Current metrics (fill as they exist; "—" until measured)
 
-> ⚠️ Numbers below are on the **synthetic fixture** (8 questions / 6 invented
-> misconceptions), NOT real Eedi. They validate the pipeline, they are **not**
-> reportable quality metrics. Real numbers require the real Eedi CSVs in `data/`.
+> ✅ **REAL Eedi numbers now measured** (see the top rows). Key finding:
+> **diagnosis is strong; retrieval is the bottleneck.** With recall@25 ≈ 0.50, the
+> off-the-shelf MiniLM retriever surfaces the gold misconception in the top-25
+> (of 2,587) only ~half the time — but conditional on retrieval, diagnosis top-1
+> is ~0.45/0.50 ≈ **90% on dev** (~67% held-out). The unseen-misconception gap
+> (top-1 0.45→0.30) is real and expected. Sample is n=20/split (single-shot,
+> indicative not final — run 150–300 for the submission number). The clear next
+> lever is a fine-tuned retriever / reranker, not the diagnosis step.
+>
+> Older rows on the **synthetic fixture** are kept for provenance but superseded.
 > Note: prompt v1→v2 barely moved on the fixture (MAP +0.03 dev, −0.02 held) —
 > expected, since 8 synthetic items is statistical noise for a prompt change. The
 > v2 reasoning prompt and retrieval are evaluated for real on Eedi, not here.
@@ -184,9 +191,10 @@ Eedi/ASAP data + demo video (human).
 
 | Metric | Value | Split | Date |
 |---|---|---|---|
-| Misconception diagnosis accuracy — top-1 (PRIMARY) | v2: 0.333 dev / 0.000 held (v1 identical) | fixture, live Opus 4.8 | 2026-07-01 |
-| Misconception MAP@k (k=25) | v2: 0.590 dev / 0.300 held (v1: 0.558 / 0.321) | fixture, live Opus 4.8 | 2026-07-01 |
-| Retrieval recall@k (retrieval ceiling) | 1.000 (in-context, small taxonomy); **embedding retrieval validated on the REAL 2,587-misconception Eedi taxonomy** — top-5 on-topic for probe queries | fixture + real taxonomy | 2026-07-01 |
+| **Misconception diagnosis top-1 (PRIMARY) — REAL Eedi** | **0.450 dev / 0.300 held-out unseen** (n=20/split) | REAL Eedi, live Opus 4.8 + MiniLM retrieval | 2026-07-01 |
+| **Misconception MAP@25 — REAL Eedi** | **0.460 dev / 0.329 held-out unseen** (n=20/split) | REAL Eedi, live | 2026-07-01 |
+| Retrieval recall@25 (the bottleneck) — REAL Eedi | 0.500 dev / 0.450 held (top-25 of 2,587, off-the-shelf MiniLM) | REAL Eedi | 2026-07-01 |
+| — same metrics on synthetic fixture (superseded) | top1 0.333 dev / MAP 0.590 | fixture | 2026-07-01 |
 | — offline-stub baseline (pipeline smoke) | top1 0.00 / MAP@25 0.35 | dev (fixture) | 2026-07-01 |
 | % auto-taggable @ threshold | 0.167 (1/6) @ conf≥0.7, k=3 | fixture, live | 2026-07-01 |
 | accuracy on auto-tagged slice | **0.000** (the 1 auto-tagged item was wrong — miscalibration, see note) | fixture, live | 2026-07-01 |
@@ -211,19 +219,22 @@ Eedi/ASAP data + demo video (human).
 
 ## Blockers / data status
 
-- **Have (real, in `data/`, gitignored):** Eedi `misconception_mapping.csv`
-  (2,587 misconceptions) → embedding retrieval validated at real scale;
-  `data/asap/meta.json` (real ASAP rubrics/prompts for all 10 sets).
-- **Still need for headline numbers:**
-  - Eedi **`train.csv`** — questions + per-distractor gold `MisconceptionId`.
-    This is the file the diagnosis-accuracy / MAP@25 numbers require. Drop into
-    `data/` (mapping already there) → `load_dataset` auto-uses real Eedi.
-  - ASAP **`train_rel_2.tsv`** → rename to `data/asap/train.tsv` for real QWK
-    (rubrics already in `data/asap/meta.json`).
-- Until those two files arrive, headline numbers remain on the synthetic fixture.
+- **Have (real, in `data/`, gitignored):** full Eedi dataset
+  (`train.csv` 4,370 labeled instances + `misconception_mapping.csv` 2,587
+  misconceptions) → **real diagnosis numbers measured**; `data/asap/meta.json`
+  (real ASAP rubrics/prompts for all 10 sets).
+- **Still need:** ASAP **`train_rel_2.tsv`** → rename to `data/asap/train.tsv`
+  for a real QWK number (rubrics already in `data/asap/meta.json`).
+- **To finalize the submission number:** run the real Eedi benchmark at
+  n=150–300/split (this session used n=20 for an indicative live number).
 
 ## Decision Log (append-only; one line each, newest first)
 
+- _2026-07-01_ — **Real Eedi measured.** Full dataset wired (4,370 instances /
+  2,587 misconceptions). n=20/split live: top-1 0.450 dev / 0.300 held-out unseen;
+  MAP@25 0.460 / 0.329; recall@25 0.500 / 0.450. Finding: retrieval (off-the-shelf
+  MiniLM) is the bottleneck (~50% recall@25); diagnosis-given-retrieval ~90% dev.
+  Next lever = fine-tuned retriever/reranker. Fixed a float-id bug in the loader.
 - _2026-07-01_ — **Bug fix + integrity re-measure:** the live structured-output
   calls used `max_turns=1`, which `output_format` can exceed → silent offline-stub
   fallback. This meant the free-response grader and the live remediation/simulated-
