@@ -26,7 +26,14 @@ from .metrics import average_precision_at_k, format_table, map_at_k, top1_accura
 
 @pytest.fixture(scope="module")
 def dataset():
-    return load_dataset()
+    # Always use the synthetic fixture so the suite stays fast, offline, and
+    # deterministic even when real Eedi data is present in data/.
+    from feedback_agent import config
+
+    return load_dataset(
+        config.FIXTURES_DIR / "eedi_train_sample.csv",
+        config.FIXTURES_DIR / "misconception_mapping.csv",
+    )
 
 
 @pytest.fixture()

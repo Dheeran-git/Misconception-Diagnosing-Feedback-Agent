@@ -33,6 +33,19 @@ from feedback_agent.models import DiagnosisItem
 _OPTIONS = ["A", "B", "C", "D"]
 
 
+def _clean_id(v) -> str:
+    """Normalize a misconception id. Eedi's train.csv stores them as floats
+    (because unlabeled cells make the column float), so '1672.0' must become
+    '1672' to match the integer ids in misconception_mapping.csv."""
+    s = str(v).strip()
+    if not s or s.lower() in {"nan", "none"}:
+        return ""
+    try:
+        return str(int(float(s)))
+    except ValueError:
+        return s
+
+
 @dataclass
 class Dataset:
     items: list[DiagnosisItem]
@@ -67,8 +80,8 @@ def load_dataset(train_csv: Path | None = None, mapping_csv: Path | None = None)
         for opt in _OPTIONS:
             if opt == correct:
                 continue
-            gold = str(row.get(f"Misconception{opt}Id", "")).strip()
-            if not gold or gold.lower() in {"nan", "none"}:
+            gold = _clean_id(row.get(f"Misconception{opt}Id", ""))
+            if not gold:
                 continue  # unlabeled distractor -> not a gradable instance
             items.append(
                 DiagnosisItem(
