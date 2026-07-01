@@ -11,7 +11,8 @@ __pycache__/
 !.env.example
 
 # Data & cache (do not commit datasets or the grade cache)
-data/
+data/*
+!data/README.md
 *.sqlite
 *.sqlite3
 
