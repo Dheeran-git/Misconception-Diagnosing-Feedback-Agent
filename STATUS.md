@@ -79,11 +79,14 @@ ASSESS step + grade cache instead. QWK scaffolding is in place for the stretch.
 > ⚠️ Numbers below are on the **synthetic fixture** (8 questions / 6 invented
 > misconceptions), NOT real Eedi. They validate the pipeline, they are **not**
 > reportable quality metrics. Real numbers require the real Eedi CSVs in `data/`.
+> Note: prompt v1→v2 barely moved on the fixture (MAP +0.03 dev, −0.02 held) —
+> expected, since 8 synthetic items is statistical noise for a prompt change. The
+> v2 reasoning prompt and retrieval are evaluated for real on Eedi, not here.
 
 | Metric | Value | Split | Date |
 |---|---|---|---|
-| Misconception diagnosis accuracy — top-1 (PRIMARY) | v1: 0.333 dev / 0.000 held · v2: _live run in progress_ | fixture, live Opus 4.8 | 2026-07-01 |
-| Misconception MAP@k (k=25) | v1: 0.558 dev / 0.321 held · v2: _live run in progress_ | fixture, live Opus 4.8 | 2026-07-01 |
+| Misconception diagnosis accuracy — top-1 (PRIMARY) | v2: 0.333 dev / 0.000 held (v1 identical) | fixture, live Opus 4.8 | 2026-07-01 |
+| Misconception MAP@k (k=25) | v2: 0.590 dev / 0.300 held (v1: 0.558 / 0.321) | fixture, live Opus 4.8 | 2026-07-01 |
 | Retrieval recall@k (retrieval ceiling) | 1.000 (in-context, small taxonomy); embedding path validated | fixture | 2026-07-01 |
 | — offline-stub baseline (pipeline smoke) | top1 0.00 / MAP@25 0.35 | dev (fixture) | 2026-07-01 |
 | % auto-taggable @ threshold | — | | |
