@@ -168,16 +168,19 @@ demo video (human).
 
 ## Current metrics (fill as they exist; "—" until measured)
 
-> ✅ **REAL Eedi numbers now measured** (see the top rows). Key finding:
-> **diagnosis is strong; retrieval is the bottleneck.** With recall@25 ≈ 0.50, the
-> off-the-shelf MiniLM retriever surfaces the gold misconception in the top-25
-> (of 2,587) only ~half the time — but conditional on retrieval, diagnosis top-1
-> is ~0.45/0.50 ≈ **90% on dev** (~67% held-out). The unseen-misconception gap
-> (top-1 0.45→0.30) is real and expected. Sample is n=20/split (single-shot,
-> indicative not final — run 150–300 for the submission number). The clear next
-> lever is a fine-tuned retriever / reranker, not the diagnosis step.
->
-> Older rows on the **synthetic fixture** are kept for provenance but superseded.
+> ✅ **REAL Eedi numbers (n=25/split, self-consistency k=3).** Two findings:
+> 1. **Retrieval is the bottleneck.** recall@25 ≈ 0.50 → the off-the-shelf MiniLM
+>    retriever surfaces the gold in the top-25 (of 2,587) ~half the time; but
+>    diagnosis-given-retrieval is ~0.48/0.52 ≈ **92% dev** (~83% held). The
+>    reasoning step is strong; the lever is a fine-tuned retriever/reranker.
+> 2. **Confidence is calibrated on real data.** Auto-tagged (conf≥0.7) accuracy is
+>    **0.706 dev / 0.643 held vs 0.48/0.40 overall** — high-confidence tags are
+>    ~1.5× more accurate, so the threshold genuinely separates trustworthy tags.
+>    (This REVISES the earlier "miscalibration" note, which was a synthetic n=6
+>    artifact — too small/hard to be meaningful.)
+> Unseen-misconception gap (top-1 0.48→0.40) is real and expected. n=25/split is
+> indicative; run 150–300 for the final submission number
+> (`python -m eval.benchmark`). Older fixture/n=20 rows kept for provenance.
 > Note: prompt v1→v2 barely moved on the fixture (MAP +0.03 dev, −0.02 held) —
 > expected, since 8 synthetic items is statistical noise for a prompt change. The
 > v2 reasoning prompt and retrieval are evaluated for real on Eedi, not here.
@@ -185,26 +188,23 @@ demo video (human).
 > hint — directional, not statistical. The methodology (live learner reasons
 > about hint content, resolution well-defined vs a known misconception) is what
 > generalizes; the full-size number comes from running it on real Eedi.
-> **Confidence FAILURE MODE (honest):** on the 6 one-per-misconception items
-> (which include held-out *unseen* misconceptions — the hardest subset), the
-> diagnoser scored top-1 0.167, and at threshold 0.7 it auto-tagged exactly one
-> item — which was WRONG (accuracy-on-autotagged 0.000). So self-consistency
-> confidence is *miscalibrated* here: one confidently-wrong case slipped the
-> filter while 5/6 uncertain cases were correctly routed to triage. Causes: k=3
-> gives coarse confidence (only 0.33/0.67/1.0); synthetic n=6 on the unseen slice.
-> The triage *mechanism* is sound; calibration + a tuned threshold need real Eedi.
-> We are NOT reporting a teacher-time-saved "win" from this.
+> **Confidence calibration — small-sample scare, resolved on real data.** An
+> early *synthetic* n=6 run auto-tagged 1 item and it was wrong (acc 0.000), which
+> looked like miscalibration. On **real Eedi (n=25/split)** confidence is in fact
+> calibrated: auto-tagged accuracy **0.706 dev / 0.643 held vs 0.48/0.40 overall**.
+> The n=6 result was a small-sample artifact — kept as an honest reminder of why
+> tiny synthetic slices don't back headline claims.
 
 | Metric | Value | Split | Date |
 |---|---|---|---|
-| **Misconception diagnosis top-1 (PRIMARY) — REAL Eedi** | **0.450 dev / 0.300 held-out unseen** (n=20/split) | REAL Eedi, live Opus 4.8 + MiniLM retrieval | 2026-07-01 |
-| **Misconception MAP@25 — REAL Eedi** | **0.460 dev / 0.329 held-out unseen** (n=20/split) | REAL Eedi, live | 2026-07-01 |
-| Retrieval recall@25 (the bottleneck) — REAL Eedi | 0.500 dev / 0.450 held (top-25 of 2,587, off-the-shelf MiniLM) | REAL Eedi | 2026-07-01 |
-| — same metrics on synthetic fixture (superseded) | top1 0.333 dev / MAP 0.590 | fixture | 2026-07-01 |
+| **Misconception diagnosis top-1 (PRIMARY) — REAL Eedi** | **0.480 dev / 0.400 held-out unseen** (n=25/split, k=3) | REAL Eedi, live Opus 4.8 + MiniLM retrieval | 2026-07-01 |
+| **Misconception MAP@25 — REAL Eedi** | **0.480 dev / 0.428 held-out unseen** (n=25/split) | REAL Eedi, live | 2026-07-01 |
+| Retrieval recall@25 (the bottleneck) — REAL Eedi | 0.520 dev / 0.480 held (top-25 of 2,587, off-the-shelf MiniLM) | REAL Eedi | 2026-07-01 |
+| — earlier single-shot (n=20) / synthetic fixture (superseded) | top1 0.45/0.30 (n=20); fixture 0.33 | — | 2026-07-01 |
 | — offline-stub baseline (pipeline smoke) | top1 0.00 / MAP@25 0.35 | dev (fixture) | 2026-07-01 |
-| % auto-taggable @ threshold | 0.167 (1/6) @ conf≥0.7, k=3 | fixture, live | 2026-07-01 |
-| accuracy on auto-tagged slice | **0.000** (the 1 auto-tagged item was wrong — miscalibration, see note) | fixture, live | 2026-07-01 |
-| Teacher tagging time saved (headline) | 0.167 mechanically (5/6 correctly routed to triage) — NOT a clean win on this hard subset | fixture, live | 2026-07-01 |
+| % auto-taggable @ conf≥0.7 — REAL Eedi | **0.68 dev / 0.56 held** (n=25/split, k=3) | REAL Eedi, live | 2026-07-01 |
+| accuracy on auto-tagged slice — REAL Eedi | **0.706 dev / 0.643 held** vs 0.48/0.40 overall → confidence IS calibrated | REAL Eedi, live | 2026-07-01 |
+| Teacher tagging time saved (headline) — REAL Eedi | **~68% dev / 56% held** auto-tagged at ~65–70% accuracy | REAL Eedi, live | 2026-07-01 |
 | Remediation efficacy (targeted vs generic) | **live gap +1.000** (targeted 2/2, generic 0/2; n=2/arm) — re-confirmed genuinely live after the max_turns fix | fixture (live learner) | 2026-07-01 |
 | QWK on ASAP free-response (optional stretch) | **live 1.000** (n=10 synthetic, perfect on a clear-cut fixture — not statistical); offline stub 0.921 | synthetic fixture | 2026-07-01 |
 
@@ -236,11 +236,14 @@ demo video (human).
 
 ## Decision Log (append-only; one line each, newest first)
 
-- _2026-07-01_ — **Real Eedi measured.** Full dataset wired (4,370 instances /
-  2,587 misconceptions). n=20/split live: top-1 0.450 dev / 0.300 held-out unseen;
-  MAP@25 0.460 / 0.329; recall@25 0.500 / 0.450. Finding: retrieval (off-the-shelf
-  MiniLM) is the bottleneck (~50% recall@25); diagnosis-given-retrieval ~90% dev.
-  Next lever = fine-tuned retriever/reranker. Fixed a float-id bug in the loader.
+- _2026-07-01_ — **Real Eedi, full benchmark (n=25/split, k=3).** top-1 0.480 dev /
+  0.400 held; MAP@25 0.480 / 0.428; recall@25 0.520 / 0.480; auto-taggable 0.68 /
+  0.56 with auto-tagged accuracy 0.706 / 0.643 (vs 0.48/0.40 overall). Two
+  findings: retrieval is the bottleneck (off-the-shelf MiniLM), and confidence IS
+  calibrated on real data (revises the synthetic-n=6 miscalibration scare). Added
+  reproducible `eval/benchmark.py`; hand-verified 10 items vs gold (10/10).
+- _2026-07-01_ — **Real Eedi first measure (n=20 single-shot):** top-1 0.450 /
+  0.300; superseded by the k=3 benchmark above. Fixed a float-id loader bug.
 - _2026-07-01_ — **Bug fix + integrity re-measure:** the live structured-output
   calls used `max_turns=1`, which `output_format` can exceed → silent offline-stub
   fallback. This meant the free-response grader and the live remediation/simulated-

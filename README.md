@@ -40,28 +40,28 @@ Days 1–6 of the 7-day plan are complete: the full loop runs end-to-end, backed
 an eval harness built **first** (Prime Directive: eval before product). The
 Streamlit dashboard (teacher triage + student feedback) serves both users.
 
-> ✅ **Measured on real Eedi.** The headline numbers below are on the actual
-> Kaggle dataset. The finding: **diagnosis is strong, retrieval is the
-> bottleneck** — off-the-shelf embedding retrieval surfaces the gold misconception
-> in the top-25 (of 2,587) only ~half the time, but *given* retrieval, diagnosis
-> top-1 is ~90% on dev. Sample is n=20/split (indicative; run 150–300 for the
-> final number). A synthetic fixture (`eval/fixtures/`) ships so the suite runs
-> without the licensed data.
+> ✅ **Measured on real Eedi.** Two findings: **(1) retrieval is the bottleneck** —
+> off-the-shelf embedding retrieval surfaces the gold misconception in the top-25
+> (of 2,587) only ~half the time, but *given* retrieval, diagnosis top-1 is ~92%
+> on dev; **(2) confidence is calibrated** — auto-tagged tags are 70.6% accurate
+> vs 48% overall, so the triage threshold separates trustworthy tags. Sample is
+> n=25/split, k=3 (indicative; run 150–300 for the final number). A synthetic
+> fixture (`eval/fixtures/`) ships so the suite runs without the licensed data.
 
 ## Metrics — and exactly how each is computed
 
 Numbers marked **REAL Eedi** are on the actual Kaggle dataset (2,587
-misconceptions, 4,370 labeled distractors); n=20/split, single-shot, live Opus
-4.8 diagnosis + off-the-shelf MiniLM retrieval — indicative, run 150–300 for the
-final submission number.
+misconceptions, 4,370 labeled distractors); n=25/split, self-consistency k=3,
+live Opus 4.8 diagnosis + off-the-shelf MiniLM retrieval — indicative, run
+150–300 (`python -m eval.benchmark`) for the final submission number.
 
 | Metric (judging axis) | Value | How it's computed |
 |---|---|---|
-| **Misconception diagnosis top-1** (Impact / primary) | **REAL Eedi: 0.450 dev · 0.300 held-out *unseen*** | predicted top-1 misconception == Eedi gold `MisconceptionId`, over one instance per labeled wrong distractor (`eval/metrics.py::top1_accuracy`) |
-| **MAP@25** (Eedi's own metric) | **REAL Eedi: 0.460 dev · 0.329 held-out** | mean 1/rank of the gold id in the ranked candidate list (`map_at_k`) |
-| **Retrieval recall@25** (Scalability / **the bottleneck**) | **REAL Eedi: 0.500 dev · 0.450 held-out** | share of items whose gold survives the top-25 retrieved (of 2,587) — recall≈0.5 means diagnosis-given-retrieval is ~90% dev; retrieval is the lever (`recall_at_k`) |
+| **Misconception diagnosis top-1** (Impact / primary) | **REAL Eedi: 0.480 dev · 0.400 held-out *unseen*** | predicted top-1 misconception == Eedi gold `MisconceptionId`, over one instance per labeled wrong distractor (`eval/metrics.py::top1_accuracy`) |
+| **MAP@25** (Eedi's own metric) | **REAL Eedi: 0.480 dev · 0.428 held-out** | mean 1/rank of the gold id in the ranked candidate list (`map_at_k`) |
+| **Retrieval recall@25** (Scalability / **the bottleneck**) | **REAL Eedi: 0.520 dev · 0.480 held-out** | share of items whose gold survives the top-25 retrieved (of 2,587) — recall≈0.5 caps top-1; diagnosis-given-retrieval ≈92% dev (`recall_at_k`) |
+| **% auto-taggable / teacher time saved** (Scalability / headline) | **REAL Eedi: 0.68 dev · 0.56 held-out**, auto-tagged accuracy **0.706 / 0.643** (vs 0.48/0.40 overall) | share with self-consistency confidence ≥ 0.7; the accuracy-on-autotagged shows the threshold is calibrated (`eval/tagging.py`, `auto_taggable_summary`) |
 | **Remediation efficacy gap** (Impact) | **+1.000** live (targeted 2/2 vs generic 0/2; n=2/arm) | resolution rate of targeted vs generic hints on a live simulated learner with a known misconception (`eval/efficacy.py`) |
-| **% auto-taggable / teacher time saved** (Scalability / headline) | 0.167 @ conf≥0.7 — see failure mode | share with self-consistency confidence ≥ threshold (`eval/tagging.py`, `auto_taggable_summary`) |
 | **QWK on ASAP free-response** (optional stretch) | live **1.000** (n=10 synthetic, clear-cut — not statistical) | quadratic-weighted kappa, human Score1 vs model rubric score (`eval/asap.py`, generalization beyond MCQ) |
 
 ### The bottleneck is retrieval, not diagnosis (real-Eedi finding)
@@ -74,10 +74,10 @@ lever is a **fine-tuned retriever / reranker** (exactly what won the Eedi
 competition), not the diagnosis prompt. The unseen-misconception gap (top-1
 0.45→0.30 dev→held) is real and expected.
 
-Confidence caveat (from an earlier synthetic run): self-consistency confidence
-was miscalibrated on a tiny hard slice (k=3 is coarse; n=6). The triage mechanism
-works (routes uncertain cases to the teacher); calibration needs a real-data
-threshold sweep. See `STATUS.md`.
+Confidence is calibrated on real data: auto-tagged (conf≥0.7) accuracy is
+**0.706 dev / 0.643 held-out vs 0.48/0.40 overall**, so the triage threshold
+genuinely separates trustworthy tags. (An earlier synthetic n=6 run looked
+miscalibrated — a small-sample artifact, corrected here.) See `STATUS.md`.
 
 ## Integrity (how we keep the numbers real)
 
@@ -153,7 +153,7 @@ in-context path to the sentence-transformers + Chroma embedding retriever.
 3. **Teacher view:** show the triage queue with confidence flags — low-confidence
    diagnoses routed for review (the autonomy + trust story).
 4. **Terminal:** `uv run pytest -q` — every number falls out of the harness; call
-   out the held-out *unseen* split and the honest calibration failure mode.
+   out the held-out *unseen* split and the retrieval-bottleneck / calibration findings.
 
 ## Repo layout
 
