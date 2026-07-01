@@ -68,10 +68,16 @@ def cache_key(
     candidate_ids: list[str],
     prompt_version: str,
     model: str,
+    variant: str = "",
 ) -> str:
+    """Cache key for one diagnosis. ``variant`` distinguishes self-consistency
+    samples (e.g. "sc0", "sc1") so each sample caches separately; empty variant
+    keeps the original key so pre-Day-5 cache entries stay valid."""
     payload = "|".join(
         [question_id, chosen_answer, ",".join(sorted(candidate_ids)), prompt_version, model]
     )
+    if variant:
+        payload += "|" + variant
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 

@@ -25,16 +25,18 @@ def diagnose_baseline(
     model: str | None = None,
     force_offline: bool = False,
     use_cache: bool = True,
+    variant: str = "",
 ) -> tuple[Diagnosis, str]:
     """Return (Diagnosis, mode). mode is 'live', 'offline', or 'cache'.
 
     Reads the SQLite diagnosis cache first; on a miss, calls the model seam and
     writes the result back. Pass ``conn`` to reuse a connection across a run.
+    ``variant`` tags self-consistency samples so they cache independently.
     """
     model = model or config.DIAGNOSIS_MODEL
     candidate_ids = [cid for cid, _ in candidates]
     key = state.cache_key(
-        item.question_id, item.chosen_answer, candidate_ids, DIAGNOSE_PROMPT_VERSION, model
+        item.question_id, item.chosen_answer, candidate_ids, DIAGNOSE_PROMPT_VERSION, model, variant
     )
 
     own_conn = conn is None

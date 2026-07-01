@@ -3,7 +3,7 @@
 > Update this at the end of every session. Keep it short and current. Claude Code:
 > reflect real state here, not aspirations.
 
-**Current day:** Day 4 (CORE COMPLETE — full loop end-to-end)
+**Current day:** Day 5 (confidence + triage + scalability number)
 **Last updated:** 2026-07-01
 **Core-complete (Day 4 loop runs end-to-end)?** ✅ YES — assess→diagnose→remediate→verify→escalate→triage runs end-to-end (offline-deterministic + live seam)
 
@@ -92,6 +92,20 @@ ASSESS step + grade cache instead. QWK scaffolding is in place for the stretch.
 - [x] Tests: 20 green + 1 gated. Loop resolve/escalate/triage paths, guardrail
       edge cases, and the efficacy gap all covered. Lint clean.
 
+## Day-5 deliverables (this session)
+
+- [x] `confidence.py` — self-consistency: diagnose k times over
+      deterministically-shuffled candidate orders (temperature-free perturbation
+      the SDK supports), agreement among top-1 picks = confidence. Each sample
+      caches under a distinct `variant` so re-runs are free.
+- [x] `should_triage(confidence, threshold)` + batch tagging pipeline
+      (`eval/tagging.py`): auto-finalize confident tags, route the rest to the
+      teacher triage queue (FR5). Produces % auto-taggable + teacher-time-saved.
+- [x] `auto_taggable_summary` metric (`eval/metrics.py`): auto-taggable rate,
+      accuracy-on-autotagged (the quality bar), teacher-time-saved.
+- [x] Tests: 24 green + 1 gated (agreement math, triage threshold, auto-taggable
+      math, k-sample confidence, tagging pipeline). Lint clean.
+
 ## Current metrics (fill as they exist; "—" until measured)
 
 > ⚠️ Numbers below are on the **synthetic fixture** (8 questions / 6 invented
@@ -111,8 +125,8 @@ ASSESS step + grade cache instead. QWK scaffolding is in place for the stretch.
 | Misconception MAP@k (k=25) | v2: 0.590 dev / 0.300 held (v1: 0.558 / 0.321) | fixture, live Opus 4.8 | 2026-07-01 |
 | Retrieval recall@k (retrieval ceiling) | 1.000 (in-context, small taxonomy); embedding path validated | fixture | 2026-07-01 |
 | — offline-stub baseline (pipeline smoke) | top1 0.00 / MAP@25 0.35 | dev (fixture) | 2026-07-01 |
-| % auto-taggable @ threshold | — | | |
-| Teacher tagging time saved (headline) | — | | |
+| % auto-taggable @ threshold | _live self-consistency run in progress_ (k=3, thr 0.7) | fixture | 2026-07-01 |
+| Teacher tagging time saved (headline) | _derived from % auto-taggable — run in progress_ | fixture | 2026-07-01 |
 | Remediation efficacy (targeted vs generic) | **live gap +1.000** (targeted 2/2 resolved, generic 0/2, both triaged; n=2/arm, 1 hint) · offline mechanism gap 1.000 | fixture (live learner) | 2026-07-01 |
 | QWK on ASAP free-response (optional stretch) | — | | |
 
@@ -124,9 +138,9 @@ ASSESS step + grade cache instead. QWK scaffolding is in place for the stretch.
 
 ## Next up
 
-- **Day 5:** `confidence.py` (self-consistency over k diagnosis samples) →
-  calibrated confidence; wire confidence-based triage routing (below threshold →
-  queue) into `agent.py`; compute % auto-taggable + teacher-time-saved (headline).
+- **Day 6:** Streamlit `app/dashboard.py` — teacher triage view (queue +
+  confidence flags + metrics) and student feedback view. Thin and legible; both
+  import the same agent module (no HTTP layer).
 - When Eedi CSVs arrive: drop `train.csv` + `misconception_mapping.csv` into
   `data/`, re-run `pytest` / harness — loader auto-prefers `data/`. On the real
   ~2.5k taxonomy, `build_retriever` auto-switches to the embedding path.
@@ -138,6 +152,11 @@ ASSESS step + grade cache instead. QWK scaffolding is in place for the stretch.
 
 ## Decision Log (append-only; one line each, newest first)
 
+- _2026-07-01_ — Day 5: confidence via self-consistency over k *candidate-order-
+  shuffled* diagnosis samples (the SDK exposes no temperature knob, so we perturb
+  ordering instead). Confidence-based triage lives in the batch tagging pipeline
+  (`eval/tagging.py`, FR5's natural home), separate from the remediation loop.
+  % auto-taggable and teacher-time-saved derive from the confidence threshold.
 - _2026-07-01_ — Day 4 (CORE COMPLETE): explicit `agent.py` state machine (no
   framework). Verify = simulated learner re-attempts and answers correctly;
   escalate = new hint at a higher level, capped at `MAX_ESCALATIONS`; unresolved

@@ -291,6 +291,61 @@ def test_efficacy_experiment_shows_gap(dataset, db):
     assert result["generic"]["triage_rate"] == pytest.approx(1.0)
 
 
+def test_agreement_confidence_and_triage():
+    from feedback_agent.confidence import agreement_confidence, should_triage
+
+    assert agreement_confidence(["a", "a", "a"]) == pytest.approx(1.0)
+    assert agreement_confidence(["a", "a", "b"]) == pytest.approx(2 / 3)
+    assert agreement_confidence([]) == 0.0
+    assert should_triage(0.6, 0.7) is True
+    assert should_triage(0.8, 0.7) is False
+
+
+def test_auto_taggable_summary_math():
+    from .metrics import auto_taggable_summary
+
+    preds = ["a", "b", "c", "d"]
+    gold = ["a", "x", "c", "y"]           # items 0,2 correct
+    confs = [0.9, 0.9, 0.5, 0.5]          # items 0,1 auto-taggable at 0.7
+    s = auto_taggable_summary(preds, gold, confs, threshold=0.7)
+    assert s["auto_taggable_rate"] == pytest.approx(0.5)
+    assert s["overall_top1"] == pytest.approx(0.5)
+    # among auto-tagged (items 0,1): item0 correct, item1 wrong -> 0.5
+    assert s["accuracy_on_autotagged"] == pytest.approx(0.5)
+    assert s["teacher_time_saved"] == pytest.approx(0.5)
+    assert s["n_routed_to_triage"] == pytest.approx(2.0)
+
+
+def test_diagnose_with_confidence_offline_is_consistent(dataset, db):
+    from feedback_agent.confidence import diagnose_with_confidence
+    from feedback_agent.taxonomy import build_retriever
+
+    r = build_retriever(dataset.mapping)
+    item = dataset.items[0]
+    cands = r.candidates(item)
+    diagnosis, picks = diagnose_with_confidence(item, cands, k=5, conn=db, force_offline=True)
+    # deterministic stub is order-invariant -> all samples agree -> confidence 1.0
+    assert len(picks) == 5
+    assert diagnosis.confidence == pytest.approx(1.0)
+
+
+def test_tagging_pipeline_offline(dataset, db):
+    from feedback_agent.state import triage_items
+
+    from .tagging import run_tagging
+
+    res = run_tagging(
+        dataset.items, dataset.mapping, k=3, threshold=0.7, conn=db, force_offline=True
+    )
+    m = res.metrics
+    assert m["n"] == len(dataset.items)
+    # offline stub is fully self-consistent -> everything auto-taggable, none triaged
+    assert m["auto_taggable_rate"] == pytest.approx(1.0)
+    assert res.n_triaged == 0
+    assert len(triage_items(db)) == 0
+    assert 0.0 <= m["accuracy_on_autotagged"] <= 1.0
+
+
 def test_diagnosis_item_shape():
     it = DiagnosisItem(
         question_id="q_A",

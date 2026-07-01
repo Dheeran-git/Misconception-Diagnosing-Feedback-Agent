@@ -21,6 +21,37 @@ def recall_at_k(candidate_id_lists: list[list[str]], gold: list[str]) -> float:
     return hits / len(gold)
 
 
+def auto_taggable_summary(
+    preds: list[str | None],
+    gold: list[str],
+    confidences: list[float],
+    *,
+    threshold: float,
+) -> dict[str, float]:
+    """% auto-taggable + teacher-time-saved (EVAL.md metrics 2 & 3).
+
+    Auto-taggable = confidence ≥ threshold (the agent tags without a human).
+    ``accuracy_on_autotagged`` is top-1 accuracy among those (the quality bar you
+    hold the threshold to). ``teacher_time_saved`` ≈ the auto-taggable share, under
+    the stated assumption that each auto-tagged distractor is one the teacher no
+    longer hand-tags.
+    """
+    n = len(gold)
+    auto = [i for i in range(n) if confidences[i] >= threshold]
+    auto_rate = len(auto) / n if n else 0.0
+    acc_auto = (
+        top1_accuracy([preds[i] for i in auto], [gold[i] for i in auto]) if auto else 0.0
+    )
+    return {
+        "n": float(n),
+        "overall_top1": top1_accuracy(preds, gold),
+        "auto_taggable_rate": auto_rate,
+        "accuracy_on_autotagged": acc_auto,
+        "teacher_time_saved": auto_rate,
+        "n_routed_to_triage": float(n - len(auto)),
+    }
+
+
 def qwk(human: list[int], model: list[int]) -> float:
     """Quadratic-weighted Cohen's kappa — the ASAP-SAS free-response agreement
     metric (EVAL.md, optional stretch). Not used on the Eedi MCQ spine; provided
