@@ -100,6 +100,10 @@ ASSESS step + grade cache instead. QWK scaffolding is in place for the stretch.
 > Note: prompt v1→v2 barely moved on the fixture (MAP +0.03 dev, −0.02 held) —
 > expected, since 8 synthetic items is statistical noise for a prompt change. The
 > v2 reasoning prompt and retrieval are evaluated for real on Eedi, not here.
+> Efficacy caveat: the live gap is n=2/arm on the synthetic fixture with a single
+> hint — directional, not statistical. The methodology (live learner reasons
+> about hint content, resolution well-defined vs a known misconception) is what
+> generalizes; the full-size number comes from running it on real Eedi.
 
 | Metric | Value | Split | Date |
 |---|---|---|---|
@@ -109,7 +113,7 @@ ASSESS step + grade cache instead. QWK scaffolding is in place for the stretch.
 | — offline-stub baseline (pipeline smoke) | top1 0.00 / MAP@25 0.35 | dev (fixture) | 2026-07-01 |
 | % auto-taggable @ threshold | — | | |
 | Teacher tagging time saved (headline) | — | | |
-| Remediation efficacy (targeted vs generic) | offline mechanism gap = 1.000 (targeted 1.0 / generic 0.0); live gap _run in progress_ | fixture | 2026-07-01 |
+| Remediation efficacy (targeted vs generic) | **live gap +1.000** (targeted 2/2 resolved, generic 0/2, both triaged; n=2/arm, 1 hint) · offline mechanism gap 1.000 | fixture (live learner) | 2026-07-01 |
 | QWK on ASAP free-response (optional stretch) | — | | |
 
 ## In progress
