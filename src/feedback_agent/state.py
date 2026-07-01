@@ -170,3 +170,39 @@ def get_attempts(conn: sqlite3.Connection, question_id: str) -> list[dict]:
     return [
         {"step": s, "chosen_answer": c, "payload": p, "created_at": t} for s, c, p, t in rows
     ]
+
+
+# --------------------------------------------------------------------------- #
+# Triage queue (FR5) — low-confidence / unresolved diagnoses for teacher review
+# --------------------------------------------------------------------------- #
+def enqueue_triage(
+    conn: sqlite3.Connection,
+    *,
+    question_id: str,
+    diagnosis: Diagnosis,
+    confidence: float,
+) -> None:
+    conn.execute(
+        "INSERT INTO triage_queue (question_id, diagnosis, confidence) VALUES (?, ?, ?)",
+        (question_id, diagnosis.model_dump_json(), confidence),
+    )
+    conn.commit()
+
+
+def triage_items(conn: sqlite3.Connection, *, only_unresolved: bool = True) -> list[dict]:
+    q = "SELECT id, question_id, diagnosis, confidence, resolved, created_at FROM triage_queue"
+    if only_unresolved:
+        q += " WHERE resolved = 0"
+    q += " ORDER BY confidence ASC, id"
+    rows = conn.execute(q).fetchall()
+    return [
+        {
+            "id": r[0],
+            "question_id": r[1],
+            "diagnosis": json.loads(r[2]) if r[2] else None,
+            "confidence": r[3],
+            "resolved": bool(r[4]),
+            "created_at": r[5],
+        }
+        for r in rows
+    ]

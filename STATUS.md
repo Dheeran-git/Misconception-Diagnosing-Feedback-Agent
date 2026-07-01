@@ -3,9 +3,9 @@
 > Update this at the end of every session. Keep it short and current. Claude Code:
 > reflect real state here, not aspirations.
 
-**Current day:** Day 3 (diagnosis: retrieval + improved prompt)
+**Current day:** Day 4 (CORE COMPLETE — full loop end-to-end)
 **Last updated:** 2026-07-01
-**Core-complete (Day 4 loop runs end-to-end)?** ❌ not yet (ASSESS + DIAGNOSE + retrieval built; remediate/verify/escalate pending)
+**Core-complete (Day 4 loop runs end-to-end)?** ✅ YES — assess→diagnose→remediate→verify→escalate→triage runs end-to-end (offline-deterministic + live seam)
 
 ## Day-0 checklist
 
@@ -74,6 +74,24 @@ ASSESS step + grade cache instead. QWK scaffolding is in place for the stretch.
 - [x] Harness builds the retriever once and reports `recall@k`. Tests: 15 green +
       1 gated embedding test (run with `FEEDBACK_AGENT_RUN_EMBED=1`). Lint clean.
 
+## Day-4 deliverables (this session) — CORE COMPLETE
+
+- [x] `agent.py` — explicit state machine assess→diagnose→remediate→verify→
+      escalate→triage. Escalation capped at `MAX_ESCALATIONS`; unresolved cases
+      route to the teacher triage queue. Every step logged (attempts, FR7) and
+      returned as a trace (FR9).
+- [x] `remediation.py` — targeted vs generic Socratic interventions + a
+      **no-answer-leak guardrail** (`leaks_answer`): a leaking live generation is
+      regenerated once, then falls back to a safe templated hint. Offline stub
+      never leaks.
+- [x] `eval/simulated_learner.py` — LLM student instantiated with a known
+      misconception (offline stub + live seam); answers free-form, verified via
+      `answers_equivalent`.
+- [x] `eval/efficacy.py` — remediation-efficacy experiment (targeted vs generic
+      resolution rate + gap). Triage queue helpers in `state.py`.
+- [x] Tests: 20 green + 1 gated. Loop resolve/escalate/triage paths, guardrail
+      edge cases, and the efficacy gap all covered. Lint clean.
+
 ## Current metrics (fill as they exist; "—" until measured)
 
 > ⚠️ Numbers below are on the **synthetic fixture** (8 questions / 6 invented
@@ -91,7 +109,7 @@ ASSESS step + grade cache instead. QWK scaffolding is in place for the stretch.
 | — offline-stub baseline (pipeline smoke) | top1 0.00 / MAP@25 0.35 | dev (fixture) | 2026-07-01 |
 | % auto-taggable @ threshold | — | | |
 | Teacher tagging time saved (headline) | — | | |
-| Remediation efficacy (targeted vs generic) | — | | |
+| Remediation efficacy (targeted vs generic) | offline mechanism gap = 1.000 (targeted 1.0 / generic 0.0); live gap _run in progress_ | fixture | 2026-07-01 |
 | QWK on ASAP free-response (optional stretch) | — | | |
 
 ## In progress
@@ -102,10 +120,9 @@ ASSESS step + grade cache instead. QWK scaffolding is in place for the stretch.
 
 ## Next up
 
-- **Day 4 (CORE COMPLETE target):** `remediation.py` (Socratic hint, no
-  answer-leak guardrail), verify/escalate logic in `agent.py`, and
-  `eval/simulated_learner.py`. Full loop runs end-to-end + remediation-efficacy
-  number (targeted vs generic). Commit as the safe working baseline.
+- **Day 5:** `confidence.py` (self-consistency over k diagnosis samples) →
+  calibrated confidence; wire confidence-based triage routing (below threshold →
+  queue) into `agent.py`; compute % auto-taggable + teacher-time-saved (headline).
 - When Eedi CSVs arrive: drop `train.csv` + `misconception_mapping.csv` into
   `data/`, re-run `pytest` / harness — loader auto-prefers `data/`. On the real
   ~2.5k taxonomy, `build_retriever` auto-switches to the embedding path.
@@ -117,6 +134,13 @@ ASSESS step + grade cache instead. QWK scaffolding is in place for the stretch.
 
 ## Decision Log (append-only; one line each, newest first)
 
+- _2026-07-01_ — Day 4 (CORE COMPLETE): explicit `agent.py` state machine (no
+  framework). Verify = simulated learner re-attempts and answers correctly;
+  escalate = new hint at a higher level, capped at `MAX_ESCALATIONS`; unresolved
+  → teacher triage. Answer-leak guardrail on remediation. Simulated learner
+  answers free-form (checked via `answers_equivalent`) so it needs no option list.
+  Offline efficacy gap is a mechanism check (stub resolves on any targeted hint);
+  the reported gap comes from the live learner.
 - _2026-07-01_ — Day 3: retrieval seam = `InContextRetriever` (small taxonomy) +
   `EmbeddingRetriever` (sentence-transformers + Chroma), auto-selected by size.
   Retrieval made **blind to gold** (dropped Day-1 gold-peeking) + added `recall@k`
@@ -145,7 +169,7 @@ ASSESS step + grade cache instead. QWK scaffolding is in place for the stretch.
 ## Demo readiness (Day 7 gate)
 
 - [ ] Headline number lands in first 10s of video
-- [ ] Live loop shown end-to-end on one example
+- [x] Live loop runs end-to-end on one example (needs the demo UI on Day 6)
 - [ ] Teacher triage view shown
 - [ ] README documents how every number is computed
 - [ ] AI-use disclosure added if rules require it

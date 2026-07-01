@@ -105,28 +105,9 @@ def _to_diagnosis(data: dict, valid_ids: set[str]) -> Diagnosis:
     )
 
 
-async def _live_diagnose_async(
-    item: DiagnosisItem, candidates: list[tuple[str, str]], model: str, template: str
-) -> Diagnosis:
-    from claude_agent_sdk import (  # imported lazily so offline never needs the SDK
-        AssistantMessage,
-        ClaudeAgentOptions,
-        ResultMessage,
-        TextBlock,
-        query,
-    )
-
-    valid_ids = {cid for cid, _ in candidates}
-    prompt = _build_prompt(template, item, candidates)
-    schema = Diagnosis.model_json_schema()
-
-    options = ClaudeAgentOptions(
-        model=model,
-        system_prompt="You are an expert mathematics teacher who diagnoses student misconceptions.",
-        allowed_tools=[],
-        max_turns=1,
-        output_format={"type": "json_schema", "schema": schema},
-    )
+async def _collect(prompt: str, options) -> tuple[dict | None, str]:
+    """Run one query() and return (structured_output, concatenated_text)."""
+    from claude_agent_sdk import AssistantMessage, ResultMessage, TextBlock, query
 
     structured: dict | None = None
     text_result = ""
@@ -139,7 +120,51 @@ async def _live_diagnose_async(
             structured = getattr(message, "structured_output", None) or structured
             if getattr(message, "result", None):
                 text_result = str(message.result)
+    return structured, text_result
 
+
+async def _live_json_async(prompt: str, schema: dict, *, model: str, system_prompt: str) -> dict:
+    """Generic single-shot structured call → validated JSON dict. Reused by
+    remediation and the simulated learner (diagnosis has its own validation)."""
+    from claude_agent_sdk import ClaudeAgentOptions
+
+    options = ClaudeAgentOptions(
+        model=model,
+        system_prompt=system_prompt,
+        allowed_tools=[],
+        max_turns=1,
+        output_format={"type": "json_schema", "schema": schema},
+    )
+    structured, text = await _collect(prompt, options)
+    data = structured or _extract_json(text)
+    if not data:
+        raise RuntimeError("live call returned no parseable JSON")
+    return data
+
+
+def live_json(prompt: str, schema: dict, *, model: str, system_prompt: str) -> dict:
+    """Sync wrapper for a live structured JSON call. Raises on failure so callers
+    can fall back to their offline stub."""
+    return asyncio.run(_live_json_async(prompt, schema, model=model, system_prompt=system_prompt))
+
+
+async def _live_diagnose_async(
+    item: DiagnosisItem, candidates: list[tuple[str, str]], model: str, template: str
+) -> Diagnosis:
+    from claude_agent_sdk import ClaudeAgentOptions
+
+    valid_ids = {cid for cid, _ in candidates}
+    prompt = _build_prompt(template, item, candidates)
+    schema = Diagnosis.model_json_schema()
+
+    options = ClaudeAgentOptions(
+        model=model,
+        system_prompt="You are an expert mathematics teacher who diagnoses student misconceptions.",
+        allowed_tools=[],
+        max_turns=1,
+        output_format={"type": "json_schema", "schema": schema},
+    )
+    structured, text_result = await _collect(prompt, options)
     data = structured or _extract_json(text_result)
     if not data:
         raise RuntimeError("live diagnosis returned no parseable JSON")

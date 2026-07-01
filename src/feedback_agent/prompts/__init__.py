@@ -15,6 +15,13 @@ PROMPTS_DIR = Path(__file__).resolve().parent
 # work-backwards reasoning + a generic worked example.
 DIAGNOSE_PROMPT_VERSION = "diagnose_v2"
 
+# Remediation prompts (Day 4). The two arms of the efficacy experiment.
+REMEDIATE_TARGETED_VERSION = "remediate_targeted_v1"
+REMEDIATE_GENERIC_VERSION = "remediate_generic_v1"
+
+# Simulated-learner prompt (Day 4).
+LEARNER_PROMPT_VERSION = "learner_v1"
+
 
 def load_prompt(version: str) -> str:
     """Return the raw template text for a prompt version (e.g. 'diagnose_v1')."""

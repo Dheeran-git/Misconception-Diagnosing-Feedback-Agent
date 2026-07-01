@@ -214,6 +214,83 @@ def test_qwk_metric():
     assert near > far
 
 
+def test_guardrail_detects_answer_leak():
+    from feedback_agent.remediation import leaks_answer
+
+    assert leaks_answer("so the answer is x = 4", "x = 4") is True
+    assert leaks_answer("remember, 4 works here", "x = 4") is True
+    assert leaks_answer("divide both sides by the coefficient", "x = 4") is False
+    assert leaks_answer("consider 1/4 of the total", "x = 4") is False  # not a bare 4
+    assert leaks_answer("what about x = 40?", "x = 4") is False          # 40 != 4
+
+
+def test_remediation_stub_targets_and_never_leaks(dataset):
+    from feedback_agent.models import Diagnosis
+    from feedback_agent.remediation import generate_intervention, leaks_answer
+
+    item = dataset.items[0]
+    dg = Diagnosis(misconception_id=item.gold_misconception_id, label="some slip", evidence="e")
+    targeted, _ = generate_intervention(item, dg, targeted=True, force_offline=True)
+    generic, _ = generate_intervention(item, dg, targeted=False, force_offline=True)
+    assert targeted.targets_misconception_id == item.gold_misconception_id
+    assert generic.targets_misconception_id is None
+    assert not leaks_answer(targeted.text, item.correct_answer_text)
+    assert not leaks_answer(generic.text, item.correct_answer_text)
+
+
+def test_loop_targeted_resolves_generic_escalates_and_triages(dataset, db):
+    from feedback_agent.agent import run_loop
+    from feedback_agent.taxonomy import build_retriever
+
+    from .simulated_learner import SimulatedLearner
+
+    r = build_retriever(dataset.mapping)
+    item = dataset.items[0]
+    gold = item.gold_misconception_id
+    learner = SimulatedLearner(gold, dataset.mapping[gold])
+
+    t = run_loop(item, learner, r, arm="targeted", conn=db, force_offline=True)
+    assert t.resolved and t.interventions_used == 1 and not t.routed_to_triage
+    assert [s["step"] for s in t.steps] == ["assess", "diagnose", "remediate"]
+
+    g = run_loop(item, learner, r, arm="generic", conn=db, force_offline=True)
+    assert not g.resolved and g.routed_to_triage
+    # 1 initial hint + MAX_ESCALATIONS escalations
+    from feedback_agent import config as cfg
+
+    assert g.interventions_used == cfg.MAX_ESCALATIONS + 1
+    assert g.escalations_used == cfg.MAX_ESCALATIONS
+    assert g.steps[-1]["step"] == "triage"
+
+
+def test_triage_queue_receives_unresolved(dataset, db):
+    from feedback_agent.agent import run_loop
+    from feedback_agent.state import triage_items
+    from feedback_agent.taxonomy import build_retriever
+
+    from .simulated_learner import SimulatedLearner
+
+    r = build_retriever(dataset.mapping)
+    item = dataset.items[1]
+    gold = item.gold_misconception_id
+    learner = SimulatedLearner(gold, dataset.mapping[gold])
+    run_loop(item, learner, r, arm="generic", conn=db, force_offline=True)
+    q = triage_items(db)
+    assert len(q) == 1 and q[0]["question_id"] == item.question_id
+
+
+def test_efficacy_experiment_shows_gap(dataset, db):
+    from .efficacy import one_per_misconception, run_efficacy
+
+    items = one_per_misconception(dataset.items)
+    result = run_efficacy(items, dataset.mapping, conn=db, force_offline=True)
+    # mechanism check: targeted resolves, generic does not -> positive gap
+    assert result["targeted"]["resolution_rate"] == pytest.approx(1.0)
+    assert result["generic"]["resolution_rate"] == pytest.approx(0.0)
+    assert result["efficacy_gap"] == pytest.approx(1.0)
+    assert result["generic"]["triage_rate"] == pytest.approx(1.0)
+
+
 def test_diagnosis_item_shape():
     it = DiagnosisItem(
         question_id="q_A",

@@ -1,8 +1,7 @@
 """Pydantic data contracts.
 
-Day 1: ``Diagnosis`` + ``DiagnosisItem``. Day 2 adds ``AssessResult`` (the FR1
-ASSESS step). ``Intervention`` (remediation) arrives on Day 4; kept out until
-then to avoid dead code.
+Day 1: ``Diagnosis`` + ``DiagnosisItem``. Day 2: ``AssessResult`` (FR1 ASSESS).
+Day 4: ``Intervention`` (remediation) + ``LearnerAttempt`` (simulated learner).
 """
 from __future__ import annotations
 
@@ -62,3 +61,29 @@ class Diagnosis(BaseModel):
     evidence: str = ""
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     ranked_misconception_ids: list[str] = Field(default_factory=list)
+
+
+class Intervention(BaseModel):
+    """FR3 REMEDIATE: a targeted Socratic hint that must not reveal the answer.
+
+    ``escalation_level`` 0 is the first hint; each unresolved verify bumps it.
+    ``leaked_answer`` is set by the guardrail if the text revealed the final
+    answer (the agent regenerates / redacts rather than showing a leak).
+    """
+
+    text: str
+    targets_misconception_id: str | None = None
+    escalation_level: int = 0
+    leaked_answer: bool = False
+
+
+class LearnerAttempt(BaseModel):
+    """A simulated learner's answer on an attempt.
+
+    ``answer`` is the free-form value the student arrives at (e.g. "x = 8"),
+    checked against the correct answer via grading.answers_equivalent — so the
+    learner never needs the full option list, only to solve the problem.
+    """
+
+    answer: str
+    reasoning: str = ""
