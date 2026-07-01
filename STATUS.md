@@ -146,8 +146,14 @@ Closed the four buildable gaps from the PRD audit:
       kappa) over human Score1 vs model score. Shows the grader generalizes beyond
       MCQ math to another domain.
 
-Still deliberately open: hand-verify ~10 grades vs gold (do on real Eedi); real
-Eedi/ASAP data + demo video (human).
+- [x] **Hand-verify vs gold (integrity)** — spot-checked 10 random real Eedi
+      items: all 10 gold misconceptions correctly match the specific chosen
+      distractor (e.g. `4/11+7/11→11/22` = "adds numerators and denominators";
+      `0.7²→0.14` = "mixes up squaring and doubling"). The harness data join is
+      correct.
+
+Still open: real ASAP `train_rel_2.tsv` (responses) for QWK — not provided;
+demo video (human).
 
 ## Day-7 deliverables (this session)
 
