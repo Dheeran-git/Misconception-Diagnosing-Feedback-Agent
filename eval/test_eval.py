@@ -93,6 +93,52 @@ def test_fixture_files_present():
     assert (root / "misconception_mapping.csv").exists()
 
 
+def test_assess_correctness_deterministic():
+    from feedback_agent.grading import assess
+
+    right = assess("q1", "B", "B", chosen_answer_text="x = 4", correct_answer_text="x = 4")
+    assert right.is_correct is True
+    assert right.confidence == 1.0
+
+    wrong = assess("q1", "a", "B")  # case-insensitive, still wrong
+    assert wrong.is_correct is False
+    assert wrong.chosen_answer == "A" and wrong.correct_answer == "B"
+
+
+def test_assess_cached_hits_cache_and_logs(db):
+    from feedback_agent.grading import assess_cached
+    from feedback_agent.state import get_attempts
+
+    first, mode1 = assess_cached(db, "q42", "C", "A", chosen_answer_text="x = 8")
+    assert mode1 == "computed" and first.is_correct is False
+    second, mode2 = assess_cached(db, "q42", "C", "A")
+    assert mode2 == "cache"
+    assert second.model_dump() == first.model_dump()
+
+    # the miss logged exactly one 'assess' attempt (the cache hit does not re-log)
+    attempts = get_attempts(db, "q42")
+    assert len(attempts) == 1 and attempts[0]["step"] == "assess"
+
+
+def test_assess_choice_uses_item_correct_answer(dataset):
+    from feedback_agent.grading import assess_choice
+
+    item = dataset.items[0]  # a wrong-distractor instance
+    # picking the item's correct option is correct; picking the distractor is not
+    assert assess_choice(item, item.correct_answer).is_correct is True
+    assert assess_choice(item, item.chosen_answer).is_correct is False
+
+
+def test_qwk_metric():
+    from .metrics import qwk
+
+    assert qwk([0, 1, 2, 3], [0, 1, 2, 3]) == pytest.approx(1.0)
+    # closer-but-wrong scores beat far-off ones under quadratic weighting
+    near = qwk([0, 1, 2, 3], [1, 1, 2, 2])
+    far = qwk([0, 1, 2, 3], [3, 2, 1, 0])
+    assert near > far
+
+
 def test_diagnosis_item_shape():
     it = DiagnosisItem(
         question_id="q_A",

@@ -16,7 +16,7 @@ import sqlite3
 from pathlib import Path
 
 from . import config
-from .models import Diagnosis
+from .models import AssessResult, Diagnosis
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS diagnosis_cache (
@@ -29,7 +29,19 @@ CREATE TABLE IF NOT EXISTS diagnosis_cache (
     created_at  TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
--- Used from Day 4+; created now so the schema is stable.
+-- Grade (ASSESS) cache. For deterministic MCQ assess there is no model call to
+-- save, but the same path caches model-driven free-response grades (ASAP stretch)
+-- and gives a cache-hit on re-run. Key = grade_key(...).
+CREATE TABLE IF NOT EXISTS grade_cache (
+    cache_key   TEXT PRIMARY KEY,
+    question_id TEXT NOT NULL,
+    model       TEXT NOT NULL,
+    prompt_ver  TEXT NOT NULL,
+    grade       TEXT NOT NULL,          -- JSON of AssessResult
+    created_at  TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Attempt log (FR7): every step of a student's journey through the loop.
 CREATE TABLE IF NOT EXISTS attempts (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     question_id   TEXT NOT NULL,
@@ -97,3 +109,64 @@ def set_cached(
         (key, question_id, model, prompt_version, mode, diagnosis.model_dump_json()),
     )
     conn.commit()
+
+
+# --------------------------------------------------------------------------- #
+# Grade (ASSESS) cache
+# --------------------------------------------------------------------------- #
+def grade_key(question_id: str, chosen_answer: str, prompt_version: str, model: str) -> str:
+    payload = "|".join([question_id, str(chosen_answer), prompt_version, model])
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def get_grade(conn: sqlite3.Connection, key: str) -> AssessResult | None:
+    row = conn.execute("SELECT grade FROM grade_cache WHERE cache_key = ?", (key,)).fetchone()
+    if row is None:
+        return None
+    return AssessResult.model_validate(json.loads(row[0]))
+
+
+def set_grade(
+    conn: sqlite3.Connection,
+    key: str,
+    *,
+    question_id: str,
+    model: str,
+    prompt_version: str,
+    grade: AssessResult,
+) -> None:
+    conn.execute(
+        "INSERT OR REPLACE INTO grade_cache "
+        "(cache_key, question_id, model, prompt_ver, grade) VALUES (?, ?, ?, ?, ?)",
+        (key, question_id, model, prompt_version, grade.model_dump_json()),
+    )
+    conn.commit()
+
+
+# --------------------------------------------------------------------------- #
+# Attempt log (FR7)
+# --------------------------------------------------------------------------- #
+def log_attempt(
+    conn: sqlite3.Connection,
+    *,
+    question_id: str,
+    step: str,
+    payload: str,
+    chosen_answer: str | None = None,
+) -> None:
+    conn.execute(
+        "INSERT INTO attempts (question_id, chosen_answer, step, payload) VALUES (?, ?, ?, ?)",
+        (question_id, chosen_answer, step, payload),
+    )
+    conn.commit()
+
+
+def get_attempts(conn: sqlite3.Connection, question_id: str) -> list[dict]:
+    rows = conn.execute(
+        "SELECT step, chosen_answer, payload, created_at FROM attempts "
+        "WHERE question_id = ? ORDER BY id",
+        (question_id,),
+    ).fetchall()
+    return [
+        {"step": s, "chosen_answer": c, "payload": p, "created_at": t} for s, c, p, t in rows
+    ]

@@ -1,9 +1,8 @@
 """Pydantic data contracts.
 
-Day 1 needs only ``Diagnosis`` (the output of the baseline diagnoser) and a small
-``DiagnosisItem`` describing one gradable instance (a single wrong distractor with
-its gold label). ``AssessResult`` / ``Intervention`` from ARCHITECTURE.md arrive
-on their days; kept out now to avoid dead code.
+Day 1: ``Diagnosis`` + ``DiagnosisItem``. Day 2 adds ``AssessResult`` (the FR1
+ASSESS step). ``Intervention`` (remediation) arrives on Day 4; kept out until
+then to avoid dead code.
 """
 from __future__ import annotations
 
@@ -26,6 +25,27 @@ class DiagnosisItem(BaseModel):
     chosen_answer: str             # the wrong option letter the student picked
     chosen_answer_text: str
     gold_misconception_id: str     # Eedi gold label for this distractor
+
+
+class AssessResult(BaseModel):
+    """FR1 ASSESS: is the student's chosen MCQ answer correct, and which option?
+
+    For MCQ this is a deterministic option-letter comparison, so ``confidence`` is
+    1.0 — there is no model call to be uncertain about. The rubric fields exist
+    only for the *optional* ASAP-SAS free-response stretch (EVAL.md) and stay
+    ``None`` on the MCQ spine.
+    """
+
+    question_id: str
+    is_correct: bool
+    chosen_answer: str                 # option letter the student picked
+    chosen_answer_text: str = ""
+    correct_answer: str                # the correct option letter
+    correct_answer_text: str = ""
+    confidence: float = Field(default=1.0, ge=0.0, le=1.0)
+    # optional (ASAP free-response stretch only):
+    rubric_score: float | None = None
+    per_criterion: dict[str, float] | None = None
 
 
 class Diagnosis(BaseModel):

@@ -3,9 +3,9 @@
 > Update this at the end of every session. Keep it short and current. Claude Code:
 > reflect real state here, not aspirations.
 
-**Current day:** Day 1 (eval harness first)
+**Current day:** Day 2 (ASSESS step + cache)
 **Last updated:** 2026-07-01
-**Core-complete (Day 4 loop runs end-to-end)?** ❌ not yet (Day 1 harness only)
+**Core-complete (Day 4 loop runs end-to-end)?** ❌ not yet (ASSESS + DIAGNOSE built; remediate/verify/escalate pending)
 
 ## Day-0 checklist
 
@@ -35,6 +35,25 @@
 - [x] `eval/test_eval.py` — 7 pytest gates (loader, unseen split, metric math,
       baseline runs, **cache-hit on re-run**). All green, offline & deterministic.
 
+## Day-2 deliverables (this session)
+
+- [x] `src/feedback_agent/grading.py` — FR1 ASSESS step for MCQ →
+      `AssessResult` (deterministic option-letter correctness, confidence 1.0),
+      plus an `answers_equivalent` seam where the Day-4 SymPy tool plugs in.
+- [x] `grade_cache` table + `get_grade`/`set_grade` and `assess_cached`
+      (cache-hit on re-run), and `attempts` logging (`log_attempt`, FR7) in
+      `state.py`.
+- [x] `qwk()` (quadratic-weighted kappa) added to `eval/metrics.py`, ready for
+      the *optional* ASAP free-response stretch — not run on the MCQ spine.
+- [x] Tests: 11 green (7 Day-1 + 4 Day-2: assess correctness, cache-hit+log,
+      assess-vs-item, QWK). Lint clean.
+
+**Deviation from PLAN.md Day 2 (logged below):** PLAN's literal Day-2 DoD
+("rubric-aware grading, QWK improves over baseline") is the ASAP free-response
+stretch, which the Decision Log already demoted to optional. On the Eedi MCQ
+spine, ASSESS is deterministic (no QWK to move), so Day 2 built the on-spine
+ASSESS step + grade cache instead. QWK scaffolding is in place for the stretch.
+
 ## Current metrics (fill as they exist; "—" until measured)
 
 > ⚠️ Numbers below are on the **synthetic fixture** (8 questions / 6 invented
@@ -59,7 +78,9 @@
 
 ## Next up
 
-- Day 2: rubric-aware grading + confirm cache behavior on real data.
+- Day 3: proper diagnosis — misconception taxonomy retrieval seam
+  (sentence-transformers + Chroma, or in-context if small) narrowing candidates,
+  improved diagnosis prompt; target beating the Day-1 baseline top-1/MAP.
 - When Eedi CSVs arrive: drop `train.csv` + `misconception_mapping.csv` into
   `data/`, re-run `pytest` / harness — loader auto-prefers `data/`.
 
@@ -70,6 +91,11 @@
 
 ## Decision Log (append-only; one line each, newest first)
 
+- _2026-07-01_ — Day 2 built the on-spine **ASSESS** step (MCQ correctness →
+  `AssessResult`) + grade cache + attempts log, NOT PLAN.md's literal "rubric
+  grading + QWK". Reason: QWK/rubric grading is free-response (ASAP), already
+  demoted to optional stretch; MCQ assess is deterministic so there is no QWK to
+  improve. QWK metric scaffolded in `eval/metrics.py` for the stretch.
 - _2026-07-01_ — Day 1: eval harness first (Prime Directive #1). Baseline diagnoser
   is single-shot, no retrieval yet (taxonomy candidate seam returns full list;
   Chroma retrieval deferred to Day 3). Offline stub + live SDK seam so pytest is

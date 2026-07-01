@@ -10,6 +10,16 @@ Definitions (see EVAL.md):
 from __future__ import annotations
 
 
+def qwk(human: list[int], model: list[int]) -> float:
+    """Quadratic-weighted Cohen's kappa — the ASAP-SAS free-response agreement
+    metric (EVAL.md, optional stretch). Not used on the Eedi MCQ spine; provided
+    so the free-response grader has its metric ready when/if that stretch runs.
+    """
+    from sklearn.metrics import cohen_kappa_score
+
+    return float(cohen_kappa_score(human, model, weights="quadratic"))
+
+
 def top1_accuracy(preds: list[str | None], gold: list[str]) -> float:
     if not gold:
         return 0.0
