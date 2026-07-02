@@ -168,19 +168,20 @@ demo video (human).
 
 ## Current metrics (fill as they exist; "—" until measured)
 
-> ✅ **REAL Eedi numbers (n=25/split, self-consistency k=3).** Two findings:
+> ✅ **REAL Eedi numbers (n=60/split, self-consistency k=3 — supersedes n=25).**
 > 1. **Retrieval is the bottleneck.** recall@25 ≈ 0.50 → the off-the-shelf MiniLM
->    retriever surfaces the gold in the top-25 (of 2,587) ~half the time; but
->    diagnosis-given-retrieval is ~0.48/0.52 ≈ **92% dev** (~83% held). The
->    reasoning step is strong; the lever is a fine-tuned retriever/reranker.
-> 2. **Confidence is calibrated on real data.** Auto-tagged (conf≥0.7) accuracy is
->    **0.706 dev / 0.643 held vs 0.48/0.40 overall** — high-confidence tags are
->    ~1.5× more accurate, so the threshold genuinely separates trustworthy tags.
->    (This REVISES the earlier "miscalibration" note, which was a synthetic n=6
->    artifact — too small/hard to be meaningful.)
-> Unseen-misconception gap (top-1 0.48→0.40) is real and expected. n=25/split is
-> indicative; run 150–300 for the final submission number
-> (`python -m eval.benchmark`). Older fixture/n=20 rows kept for provenance.
+>    retriever surfaces the gold in the top-25 (of 2,587) ~half the time;
+>    diagnosis-given-retrieval is ~0.81 dev / 0.71 held. The reasoning step is
+>    strong; the lever is a fine-tuned retriever/reranker.
+> 2. **Confidence is calibrated, but modestly.** Auto-tagged (conf≥0.7) accuracy
+>    beats overall on both splits (0.581 vs 0.417 dev; 0.439 vs 0.333 held) — so
+>    confidence helps, but far less than the noisy n=25 (0.706 vs 0.48) implied. At
+>    conf 0.7 you auto-tag ~70% at only ~44–58% accuracy; raise the threshold to
+>    hold an expert bar. (Scaling n=25→60 is exactly what corrected the optimism —
+>    the earlier synthetic n=6 "miscalibration" and rosy n=25 were both artifacts.)
+> Unseen gap (top-1 0.42→0.33) is real and expected. n=60/split is solid but not
+> final; 150–300 (`python -m eval.benchmark`) tightens it further. Older
+> n=25/n=20/fixture rows kept for provenance.
 > Note: prompt v1→v2 barely moved on the fixture (MAP +0.03 dev, −0.02 held) —
 > expected, since 8 synthetic items is statistical noise for a prompt change. The
 > v2 reasoning prompt and retrieval are evaluated for real on Eedi, not here.
@@ -197,14 +198,14 @@ demo video (human).
 
 | Metric | Value | Split | Date |
 |---|---|---|---|
-| **Misconception diagnosis top-1 (PRIMARY) — REAL Eedi** | **0.480 dev / 0.400 held-out unseen** (n=25/split, k=3) | REAL Eedi, live Opus 4.8 + MiniLM retrieval | 2026-07-01 |
-| **Misconception MAP@25 — REAL Eedi** | **0.480 dev / 0.428 held-out unseen** (n=25/split) | REAL Eedi, live | 2026-07-01 |
-| Retrieval recall@25 (the bottleneck) — REAL Eedi | 0.520 dev / 0.480 held (top-25 of 2,587, off-the-shelf MiniLM) | REAL Eedi | 2026-07-01 |
-| — earlier single-shot (n=20) / synthetic fixture (superseded) | top1 0.45/0.30 (n=20); fixture 0.33 | — | 2026-07-01 |
+| **Misconception diagnosis top-1 (PRIMARY) — REAL Eedi** | **0.417 dev / 0.333 held-out unseen** (n=60/split, k=3) | REAL Eedi, live Opus 4.8 + MiniLM retrieval | 2026-07-01 |
+| **Misconception MAP@25 — REAL Eedi** | **0.450 dev / 0.394 held-out unseen** (n=60/split) | REAL Eedi, live | 2026-07-01 |
+| Retrieval recall@25 (the bottleneck) — REAL Eedi | 0.517 dev / 0.467 held (top-25 of 2,587, off-the-shelf MiniLM) | REAL Eedi | 2026-07-01 |
+| — earlier noisier samples (superseded) | n=25/split k=3: 0.48/0.40; n=20 single-shot: 0.45/0.30; fixture 0.33 | — | 2026-07-01 |
 | — offline-stub baseline (pipeline smoke) | top1 0.00 / MAP@25 0.35 | dev (fixture) | 2026-07-01 |
-| % auto-taggable @ conf≥0.7 — REAL Eedi | **0.68 dev / 0.56 held** (n=25/split, k=3) | REAL Eedi, live | 2026-07-01 |
-| accuracy on auto-tagged slice — REAL Eedi | **0.706 dev / 0.643 held** vs 0.48/0.40 overall → confidence IS calibrated | REAL Eedi, live | 2026-07-01 |
-| Teacher tagging time saved (headline) — REAL Eedi | **~68% dev / 56% held** auto-tagged at ~65–70% accuracy | REAL Eedi, live | 2026-07-01 |
+| % auto-taggable @ conf≥0.7 — REAL Eedi | **0.717 dev / 0.683 held** (n=60/split, k=3) | REAL Eedi, live | 2026-07-01 |
+| accuracy on auto-tagged slice — REAL Eedi | **0.581 dev / 0.439 held** vs 0.417/0.333 overall → modest but real calibration (raise threshold to hold a higher bar) | REAL Eedi, live | 2026-07-01 |
+| Teacher tagging time saved (headline) — REAL Eedi | ~72% dev / 68% held auto-tagged, but only at ~44–58% accuracy @ conf 0.7 — tune the threshold for an expert bar | REAL Eedi, live | 2026-07-01 |
 | Remediation efficacy (targeted vs generic) | **live gap +1.000** (targeted 2/2, generic 0/2; n=2/arm) — re-confirmed genuinely live after the max_turns fix | fixture (live learner) | 2026-07-01 |
 | QWK on ASAP-SAS free-response (stretch) — REAL | **pooled 0.599 (n=80); mean-per-set 0.357** (8/set × 10 sets, zero-shot Haiku, generic rubrics) | REAL ASAP-SAS, live | 2026-07-01 |
 
@@ -238,6 +239,11 @@ demo video (human).
 
 ## Decision Log (append-only; one line each, newest first)
 
+- _2026-07-01_ — **Scaled Eedi benchmark (n=60/split, k=3)** supersedes n=25. top-1
+  0.417 dev / 0.333 held; MAP@25 0.450 / 0.394; recall@25 0.517 / 0.467;
+  auto-taggable 0.72 / 0.68 at auto-tagged accuracy 0.581 / 0.439 (vs 0.417/0.333
+  overall). Scaling corrected the optimistic n=25: calibration is real but modest
+  (raise threshold for an expert bar); retrieval bottleneck confirmed. Honest read.
 - _2026-07-01_ — **Real ASAP-SAS QWK measured.** Full `train_rel_2.tsv` (17,043
   responses / 10 sets) wired; rebuilt `meta.json` with real per-set rubric scoring
   guides from the description docs. Zero-shot Haiku grader, 8/set: pooled QWK

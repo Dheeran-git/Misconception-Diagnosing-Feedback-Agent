@@ -40,27 +40,27 @@ Days 1–6 of the 7-day plan are complete: the full loop runs end-to-end, backed
 an eval harness built **first** (Prime Directive: eval before product). The
 Streamlit dashboard (teacher triage + student feedback) serves both users.
 
-> ✅ **Measured on real Eedi.** Two findings: **(1) retrieval is the bottleneck** —
-> off-the-shelf embedding retrieval surfaces the gold misconception in the top-25
-> (of 2,587) only ~half the time, but *given* retrieval, diagnosis top-1 is ~92%
-> on dev; **(2) confidence is calibrated** — auto-tagged tags are 70.6% accurate
-> vs 48% overall, so the triage threshold separates trustworthy tags. Sample is
-> n=25/split, k=3 (indicative; run 150–300 for the final number). A synthetic
-> fixture (`eval/fixtures/`) ships so the suite runs without the licensed data.
+> ✅ **Measured on real Eedi** (n=60/split, k=3). Two findings: **(1) retrieval is
+> the bottleneck** — off-the-shelf embedding retrieval surfaces the gold
+> misconception in the top-25 (of 2,587) only ~half the time, but *given*
+> retrieval, diagnosis top-1 is ~81% on dev; **(2) confidence is calibrated, but
+> modestly** — auto-tagged tags are 58% accurate vs 42% overall (dev), so the
+> threshold helps and should be raised to hold an expert bar. A synthetic fixture
+> (`eval/fixtures/`) ships so the suite runs without the licensed data.
 
 ## Metrics — and exactly how each is computed
 
 Numbers marked **REAL Eedi** are on the actual Kaggle dataset (2,587
-misconceptions, 4,370 labeled distractors); n=25/split, self-consistency k=3,
-live Opus 4.8 diagnosis + off-the-shelf MiniLM retrieval — indicative, run
-150–300 (`python -m eval.benchmark`) for the final submission number.
+misconceptions, 4,370 labeled distractors); n=60/split, self-consistency k=3,
+live Opus 4.8 diagnosis + off-the-shelf MiniLM retrieval — solid but not final;
+run 150–300 (`python -m eval.benchmark`) for the submission number.
 
 | Metric (judging axis) | Value | How it's computed |
 |---|---|---|
-| **Misconception diagnosis top-1** (Impact / primary) | **REAL Eedi: 0.480 dev · 0.400 held-out *unseen*** | predicted top-1 misconception == Eedi gold `MisconceptionId`, over one instance per labeled wrong distractor (`eval/metrics.py::top1_accuracy`) |
-| **MAP@25** (Eedi's own metric) | **REAL Eedi: 0.480 dev · 0.428 held-out** | mean 1/rank of the gold id in the ranked candidate list (`map_at_k`) |
-| **Retrieval recall@25** (Scalability / **the bottleneck**) | **REAL Eedi: 0.520 dev · 0.480 held-out** | share of items whose gold survives the top-25 retrieved (of 2,587) — recall≈0.5 caps top-1; diagnosis-given-retrieval ≈92% dev (`recall_at_k`) |
-| **% auto-taggable / teacher time saved** (Scalability / headline) | **REAL Eedi: 0.68 dev · 0.56 held-out**, auto-tagged accuracy **0.706 / 0.643** (vs 0.48/0.40 overall) | share with self-consistency confidence ≥ 0.7; the accuracy-on-autotagged shows the threshold is calibrated (`eval/tagging.py`, `auto_taggable_summary`) |
+| **Misconception diagnosis top-1** (Impact / primary) | **REAL Eedi: 0.417 dev · 0.333 held-out *unseen*** (n=60/split) | predicted top-1 misconception == Eedi gold `MisconceptionId`, over one instance per labeled wrong distractor (`eval/metrics.py::top1_accuracy`) |
+| **MAP@25** (Eedi's own metric) | **REAL Eedi: 0.450 dev · 0.394 held-out** | mean 1/rank of the gold id in the ranked candidate list (`map_at_k`) |
+| **Retrieval recall@25** (Scalability / **the bottleneck**) | **REAL Eedi: 0.517 dev · 0.467 held-out** | share of items whose gold survives the top-25 retrieved (of 2,587) — recall≈0.5 caps top-1; diagnosis-given-retrieval ≈81% dev (`recall_at_k`) |
+| **% auto-taggable / teacher time saved** (Scalability / headline) | **REAL Eedi: 0.72 dev · 0.68 held-out**, auto-tagged accuracy **0.581 / 0.439** (vs 0.417/0.333 overall) | share with self-consistency confidence ≥ 0.7; auto-tagged beats overall (modest calibration) — raise the threshold to hold a higher accuracy bar (`eval/tagging.py`) |
 | **Remediation efficacy gap** (Impact) | **+1.000** live (targeted 2/2 vs generic 0/2; n=2/arm) | resolution rate of targeted vs generic hints on a live simulated learner with a known misconception (`eval/efficacy.py`) |
 | **QWK on ASAP-SAS free-response** (stretch) | **REAL: pooled 0.599 (n=80), mean-per-set 0.357** | quadratic-weighted kappa, human Score1 vs model rubric score across 10 essay sets — zero-shot Haiku baseline, shows the grader generalizes beyond MCQ (`eval/asap.py`) |
 
@@ -68,16 +68,18 @@ live Opus 4.8 diagnosis + off-the-shelf MiniLM retrieval — indicative, run
 
 recall@25 ≈ 0.50 on real Eedi means the off-the-shelf MiniLM retriever surfaces
 the gold misconception in the top-25 (of 2,587) only about half the time — that
-caps top-1 at ~0.50. But top-1 0.45 ÷ recall 0.50 ≈ **90% diagnosis accuracy when
-the gold was retrieved** (dev). So the reasoning step is strong; the clear next
-lever is a **fine-tuned retriever / reranker** (exactly what won the Eedi
-competition), not the diagnosis prompt. The unseen-misconception gap (top-1
-0.45→0.30 dev→held) is real and expected.
+caps top-1. But top-1 0.417 ÷ recall 0.517 ≈ **81% diagnosis accuracy when the
+gold was retrieved** (dev). So the reasoning step is strong; the clear next lever
+is a **fine-tuned retriever / reranker** (exactly what won the Eedi competition),
+not the diagnosis prompt. The unseen-misconception gap (top-1 0.42→0.33
+dev→held) is real and expected.
 
-Confidence is calibrated on real data: auto-tagged (conf≥0.7) accuracy is
-**0.706 dev / 0.643 held-out vs 0.48/0.40 overall**, so the triage threshold
-genuinely separates trustworthy tags. (An earlier synthetic n=6 run looked
-miscalibrated — a small-sample artifact, corrected here.) See `STATUS.md`.
+Confidence is calibrated on real data, modestly: auto-tagged (conf≥0.7) accuracy
+is **0.581 dev / 0.439 held-out vs 0.417/0.333 overall** — the threshold helps
+(auto-tagged beats overall on both splits) but at conf 0.7 it still auto-tags ~70%
+at only ~44–58% accuracy, so raise the threshold to hold an expert bar. (Numbers
+firmed up going from a noisy n=25 to n=60; an even earlier synthetic n=6 was a
+misleading artifact.) See `STATUS.md`.
 
 ## Integrity (how we keep the numbers real)
 
