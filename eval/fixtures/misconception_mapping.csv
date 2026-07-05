@@ -1,0 +1,7 @@
+MisconceptionId,MisconceptionName
+1,Subtracts the coefficient from the constant instead of dividing by it when isolating the variable
+2,Changes the sign incorrectly when moving a term across the equals sign
+3,Adds the constant to both sides instead of subtracting it when isolating the variable
+4,Divides only the variable term by the coefficient rather than the whole side
+5,Multiplies only the first term inside the brackets when expanding
+6,Thinks the variable disappears when its coefficient is 1

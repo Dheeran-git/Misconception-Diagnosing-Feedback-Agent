@@ -1,0 +1,7 @@
+{
+  "1": {
+    "question": "Explain why plants need sunlight to grow.",
+    "max_score": 3,
+    "rubric": "0 = no relevant biology. 1 = mentions sunlight or energy only, vaguely. 2 = mentions photosynthesis or converting sunlight to energy. 3 = explains photosynthesis using chlorophyll to convert sunlight into glucose and energy."
+  }
+}

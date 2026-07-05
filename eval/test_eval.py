@@ -1,0 +1,469 @@
+"""Day-1 eval gate.
+
+Runs the baseline diagnoser over the dataset (synthetic fixture until real Eedi
+data is dropped into data/) and asserts the pipeline produces *valid* metrics.
+These are **loose regression gates**, not quality thresholds — the point of Day 1
+is that measuring works, and that re-runs hit the cache instead of the model.
+
+Runs in OFFLINE mode by default so the suite is deterministic and spends no
+Agent SDK credit. When the live SDK path is exercised elsewhere it populates the
+same cache, and these tests then read the real predictions from disk.
+"""
+from __future__ import annotations
+
+import os
+from pathlib import Path
+
+import pytest
+
+from feedback_agent import state
+from feedback_agent.models import DiagnosisItem
+
+from . import harness
+from .dataset import load_dataset, unseen_misconception_split
+from .metrics import average_precision_at_k, format_table, map_at_k, top1_accuracy
+
+
+@pytest.fixture(scope="module")
+def dataset():
+    # Always use the synthetic fixture so the suite stays fast, offline, and
+    # deterministic even when real Eedi data is present in data/.
+    from feedback_agent import config
+
+    return load_dataset(
+        config.FIXTURES_DIR / "eedi_train_sample.csv",
+        config.FIXTURES_DIR / "misconception_mapping.csv",
+    )
+
+
+@pytest.fixture()
+def db(tmp_path):
+    # Isolated cache DB per test so we never touch data/cache.sqlite.
+    conn = state.connect(tmp_path / "test_cache.sqlite")
+    yield conn
+    conn.close()
+
+
+def test_dataset_loads_and_explodes(dataset):
+    assert len(dataset.items) >= 8, "expected several gradable distractor instances"
+    assert dataset.mapping, "misconception mapping should be non-empty"
+    # every gradable item must carry a gold id that exists in the taxonomy
+    for it in dataset.items:
+        assert it.gold_misconception_id in dataset.mapping
+        assert it.chosen_answer != it.correct_answer
+
+
+def test_unseen_split_holds_misconceptions_out_entirely(dataset):
+    dev, heldout = unseen_misconception_split(dataset, seed=13)
+    assert dev and heldout, "both splits should be non-empty"
+    dev_ids = {it.gold_misconception_id for it in dev}
+    held_ids = {it.gold_misconception_id for it in heldout}
+    # the whole point: held-out misconceptions never appear in dev
+    assert dev_ids.isdisjoint(held_ids)
+
+
+def test_metric_math():
+    # AP@k for a single relevant item is 1/rank.
+    assert average_precision_at_k(["a", "b", "c"], "b", k=25) == pytest.approx(0.5)
+    assert average_precision_at_k(["a", "b", "c"], "z", k=25) == 0.0
+    assert top1_accuracy(["a", "b", None], ["a", "x", "y"]) == pytest.approx(1 / 3)
+    assert map_at_k([["a", "b"], ["b", "a"]], ["a", "a"], k=25) == pytest.approx(0.75)
+
+
+def test_baseline_runs_and_reports(dataset, db, capsys):
+    dev, heldout = unseen_misconception_split(dataset, seed=13)
+    result = harness.run(dev, dataset.mapping, conn=db, force_offline=True, split_name="dev")
+
+    m = result.metrics
+    assert m["n"] == len(dev)
+    assert 0.0 <= m["top1_accuracy"] <= 1.0
+    assert 0.0 <= m["map@25"] <= 1.0
+    # offline baseline should do strictly better than nothing on MAP (ranking works)
+    assert m["map@25"] > 0.0
+
+    print("\n" + format_table(m, "dev (offline stub)"))
+    print("modes:", dict(result.modes))
+
+
+def test_rerun_hits_cache(dataset, db):
+    items = dataset.items[:5]
+    first = harness.run(items, dataset.mapping, conn=db, force_offline=True)
+    assert first.modes["offline"] == len(items)
+    # second pass over the same items + same DB must be served entirely from cache
+    second = harness.run(items, dataset.mapping, conn=db, force_offline=True)
+    assert second.modes["cache"] == len(items)
+    assert second.modes["offline"] == 0
+
+
+def test_fixture_files_present():
+    root = Path(__file__).resolve().parent / "fixtures"
+    assert (root / "eedi_train_sample.csv").exists()
+    assert (root / "misconception_mapping.csv").exists()
+
+
+def test_assess_correctness_deterministic():
+    from feedback_agent.grading import assess
+
+    right = assess("q1", "B", "B", chosen_answer_text="x = 4", correct_answer_text="x = 4")
+    assert right.is_correct is True
+    assert right.confidence == 1.0
+
+    wrong = assess("q1", "a", "B")  # case-insensitive, still wrong
+    assert wrong.is_correct is False
+    assert wrong.chosen_answer == "A" and wrong.correct_answer == "B"
+
+
+def test_assess_cached_hits_cache_and_logs(db):
+    from feedback_agent.grading import assess_cached
+    from feedback_agent.state import get_attempts
+
+    first, mode1 = assess_cached(db, "q42", "C", "A", chosen_answer_text="x = 8")
+    assert mode1 == "computed" and first.is_correct is False
+    second, mode2 = assess_cached(db, "q42", "C", "A")
+    assert mode2 == "cache"
+    assert second.model_dump() == first.model_dump()
+
+    # the miss logged exactly one 'assess' attempt (the cache hit does not re-log)
+    attempts = get_attempts(db, "q42")
+    assert len(attempts) == 1 and attempts[0]["step"] == "assess"
+
+
+def test_assess_choice_uses_item_correct_answer(dataset):
+    from feedback_agent.grading import assess_choice
+
+    item = dataset.items[0]  # a wrong-distractor instance
+    # picking the item's correct option is correct; picking the distractor is not
+    assert assess_choice(item, item.correct_answer).is_correct is True
+    assert assess_choice(item, item.chosen_answer).is_correct is False
+
+
+def test_recall_at_k_metric():
+    from .metrics import recall_at_k
+
+    cands = [["a", "b", "c"], ["x", "y"]]
+    assert recall_at_k(cands, ["b", "z"]) == pytest.approx(0.5)
+    assert recall_at_k(cands, ["a", "x"]) == pytest.approx(1.0)
+
+
+def test_incontext_retriever_is_blind_and_capped(dataset):
+    from feedback_agent.taxonomy import InContextRetriever, build_retriever
+
+    item = dataset.items[0]
+    r = build_retriever(dataset.mapping)  # small taxonomy -> in-context
+    assert isinstance(r, InContextRetriever)
+    all_c = r.candidates(item)
+    assert len(all_c) == len(dataset.mapping)
+    # capping must NOT special-case the gold (blind retrieval)
+    capped_ids = [cid for cid, _ in r.candidates(item, k=2)]
+    assert len(capped_ids) == 2
+    assert capped_ids == list(dataset.mapping.keys())[:2]
+
+
+def test_build_retriever_selects_by_size(dataset):
+    from feedback_agent.taxonomy import InContextRetriever, build_retriever
+
+    assert isinstance(build_retriever(dataset.mapping, kind="incontext"), InContextRetriever)
+    # 'auto' on the tiny fixture stays in-context (no model download in tests)
+    assert isinstance(build_retriever(dataset.mapping, kind="auto"), InContextRetriever)
+
+
+def test_harness_reports_recall(dataset, db):
+    dev, _ = unseen_misconception_split(dataset, seed=13)
+    r = harness.run(dev, dataset.mapping, conn=db, force_offline=True)
+    # in-context retriever returns the whole (small) taxonomy -> gold always present
+    key = next(k for k in r.metrics if k.startswith("recall@"))
+    assert r.metrics[key] == pytest.approx(1.0)
+
+
+@pytest.mark.skipif(
+    os.getenv("FEEDBACK_AGENT_RUN_EMBED") != "1",
+    reason="embedding retriever downloads a model + needs network; set FEEDBACK_AGENT_RUN_EMBED=1",
+)
+def test_embedding_retriever_narrows_large_taxonomy(dataset):
+    from feedback_agent.taxonomy import EmbeddingRetriever
+
+    # 6 real linear-equation misconceptions + noise on unrelated topics
+    mapping = dict(dataset.mapping)
+    noise = {
+        f"n{i}": name
+        for i, name in enumerate(
+            [
+                "Confuses the area and perimeter of a rectangle",
+                "Believes the mean is the middle value of a sorted list",
+                "Thinks probability can exceed 1",
+                "Rounds to the nearest ten instead of the nearest whole number",
+                "Confuses acute and obtuse angles",
+                "Believes multiplying two negatives gives a negative",
+                "Thinks a fraction is larger when its denominator is larger",
+                "Confuses radius and diameter of a circle",
+            ],
+            start=1,
+        )
+    }
+    mapping.update(noise)
+
+    r = EmbeddingRetriever(mapping)
+    item = next(it for it in dataset.items if it.gold_misconception_id in dataset.mapping)
+    top = [cid for cid, _ in r.candidates(item, k=6)]
+    assert len(top) == 6
+    assert item.gold_misconception_id in top  # gold survives retrieval
+    # at least one obviously-unrelated noise id is filtered out
+    assert any(cid not in top for cid in noise)
+
+
+def test_qwk_metric():
+    from .metrics import qwk
+
+    assert qwk([0, 1, 2, 3], [0, 1, 2, 3]) == pytest.approx(1.0)
+    # closer-but-wrong scores beat far-off ones under quadratic weighting
+    near = qwk([0, 1, 2, 3], [1, 1, 2, 2])
+    far = qwk([0, 1, 2, 3], [3, 2, 1, 0])
+    assert near > far
+
+
+def test_guardrail_detects_answer_leak():
+    from feedback_agent.remediation import leaks_answer
+
+    assert leaks_answer("so the answer is x = 4", "x = 4") is True
+    assert leaks_answer("remember, 4 works here", "x = 4") is True
+    assert leaks_answer("divide both sides by the coefficient", "x = 4") is False
+    assert leaks_answer("consider 1/4 of the total", "x = 4") is False  # not a bare 4
+    assert leaks_answer("what about x = 40?", "x = 4") is False          # 40 != 4
+
+
+def test_remediation_stub_targets_and_never_leaks(dataset):
+    from feedback_agent.models import Diagnosis
+    from feedback_agent.remediation import generate_intervention, leaks_answer
+
+    item = dataset.items[0]
+    dg = Diagnosis(misconception_id=item.gold_misconception_id, label="some slip", evidence="e")
+    targeted, _ = generate_intervention(item, dg, targeted=True, force_offline=True)
+    generic, _ = generate_intervention(item, dg, targeted=False, force_offline=True)
+    assert targeted.targets_misconception_id == item.gold_misconception_id
+    assert generic.targets_misconception_id is None
+    assert not leaks_answer(targeted.text, item.correct_answer_text)
+    assert not leaks_answer(generic.text, item.correct_answer_text)
+
+
+def test_loop_targeted_resolves_generic_escalates_and_triages(dataset, db):
+    from feedback_agent.agent import run_loop
+    from feedback_agent.taxonomy import build_retriever
+
+    from .simulated_learner import SimulatedLearner
+
+    r = build_retriever(dataset.mapping)
+    item = dataset.items[0]
+    gold = item.gold_misconception_id
+    learner = SimulatedLearner(gold, dataset.mapping[gold])
+
+    t = run_loop(item, learner, r, arm="targeted", conn=db, force_offline=True)
+    assert t.resolved and t.interventions_used == 1 and not t.routed_to_triage
+    assert [s["step"] for s in t.steps] == ["assess", "diagnose", "remediate"]
+
+    g = run_loop(item, learner, r, arm="generic", conn=db, force_offline=True)
+    assert not g.resolved and g.routed_to_triage
+    # 1 initial hint + MAX_ESCALATIONS escalations
+    from feedback_agent import config as cfg
+
+    assert g.interventions_used == cfg.MAX_ESCALATIONS + 1
+    assert g.escalations_used == cfg.MAX_ESCALATIONS
+    assert g.steps[-1]["step"] == "triage"
+
+
+def test_triage_queue_receives_unresolved(dataset, db):
+    from feedback_agent.agent import run_loop
+    from feedback_agent.state import triage_items
+    from feedback_agent.taxonomy import build_retriever
+
+    from .simulated_learner import SimulatedLearner
+
+    r = build_retriever(dataset.mapping)
+    item = dataset.items[1]
+    gold = item.gold_misconception_id
+    learner = SimulatedLearner(gold, dataset.mapping[gold])
+    run_loop(item, learner, r, arm="generic", conn=db, force_offline=True)
+    q = triage_items(db)
+    assert len(q) == 1 and q[0]["question_id"] == item.question_id
+
+
+def test_efficacy_experiment_shows_gap(dataset, db):
+    from .efficacy import one_per_misconception, run_efficacy
+
+    items = one_per_misconception(dataset.items)
+    result = run_efficacy(items, dataset.mapping, conn=db, force_offline=True)
+    # mechanism check: targeted resolves, generic does not -> positive gap
+    assert result["targeted"]["resolution_rate"] == pytest.approx(1.0)
+    assert result["generic"]["resolution_rate"] == pytest.approx(0.0)
+    assert result["efficacy_gap"] == pytest.approx(1.0)
+    assert result["generic"]["triage_rate"] == pytest.approx(1.0)
+
+
+def test_agreement_confidence_and_triage():
+    from feedback_agent.confidence import agreement_confidence, should_triage
+
+    assert agreement_confidence(["a", "a", "a"]) == pytest.approx(1.0)
+    assert agreement_confidence(["a", "a", "b"]) == pytest.approx(2 / 3)
+    assert agreement_confidence([]) == 0.0
+    assert should_triage(0.6, 0.7) is True
+    assert should_triage(0.8, 0.7) is False
+
+
+def test_auto_taggable_summary_math():
+    from .metrics import auto_taggable_summary
+
+    preds = ["a", "b", "c", "d"]
+    gold = ["a", "x", "c", "y"]           # items 0,2 correct
+    confs = [0.9, 0.9, 0.5, 0.5]          # items 0,1 auto-taggable at 0.7
+    s = auto_taggable_summary(preds, gold, confs, threshold=0.7)
+    assert s["auto_taggable_rate"] == pytest.approx(0.5)
+    assert s["overall_top1"] == pytest.approx(0.5)
+    # among auto-tagged (items 0,1): item0 correct, item1 wrong -> 0.5
+    assert s["accuracy_on_autotagged"] == pytest.approx(0.5)
+    assert s["teacher_time_saved"] == pytest.approx(0.5)
+    assert s["n_routed_to_triage"] == pytest.approx(2.0)
+
+
+def test_diagnose_with_confidence_offline_is_consistent(dataset, db):
+    from feedback_agent.confidence import diagnose_with_confidence
+    from feedback_agent.taxonomy import build_retriever
+
+    r = build_retriever(dataset.mapping)
+    item = dataset.items[0]
+    cands = r.candidates(item)
+    diagnosis, picks = diagnose_with_confidence(item, cands, k=5, conn=db, force_offline=True)
+    # deterministic stub is order-invariant -> all samples agree -> confidence 1.0
+    assert len(picks) == 5
+    assert diagnosis.confidence == pytest.approx(1.0)
+
+
+def test_tagging_pipeline_offline(dataset, db):
+    from feedback_agent.state import triage_items
+
+    from .tagging import run_tagging
+
+    res = run_tagging(
+        dataset.items, dataset.mapping, k=3, threshold=0.7, conn=db, force_offline=True
+    )
+    m = res.metrics
+    assert m["n"] == len(dataset.items)
+    # offline stub is fully self-consistent -> everything auto-taggable, none triaged
+    assert m["auto_taggable_rate"] == pytest.approx(1.0)
+    assert res.n_triaged == 0
+    assert len(triage_items(db)) == 0
+    assert 0.0 <= m["accuracy_on_autotagged"] <= 1.0
+
+
+def test_sympy_math_equivalence():
+    from feedback_agent.grading import answers_equivalent
+    from feedback_agent.tools.math_check import math_equivalent
+
+    assert math_equivalent("1/2", "0.5").equivalent is True
+    assert math_equivalent("2x+3", "3+2*x").equivalent is True
+    assert math_equivalent("x = 4", "4").equivalent is True
+    assert math_equivalent("x = 8", "x = 4").equivalent is False
+    # grading uses it; MCQ option letters still behave
+    assert answers_equivalent("B", "B") is True
+    assert answers_equivalent("A", "B") is False
+
+
+def test_trace_logger_writes_jsonl(tmp_path):
+    from feedback_agent.trace import TraceLogger
+
+    t = TraceLogger("run1", sink_dir=tmp_path)
+    t.log("diagnose", {"misconception_id": "3"})
+    t.log("remediate", {"level": 0})
+    rows = t.read()
+    assert [r["step"] for r in rows] == ["diagnose", "remediate"]
+    assert rows[0]["seq"] == 1 and rows[1]["seq"] == 2
+    assert t.path.exists()
+
+
+def test_loop_writes_trace_and_low_confidence_triages(dataset, db, tmp_path, monkeypatch):
+    from feedback_agent import agent as agent_mod
+    from feedback_agent.agent import run_loop
+    from feedback_agent.state import triage_items
+    from feedback_agent.taxonomy import build_retriever
+    from feedback_agent.trace import TraceLogger
+
+    from .simulated_learner import SimulatedLearner
+
+    # Force a low-confidence diagnosis so the confidence route fires even though
+    # the (targeted) stub learner would otherwise resolve.
+    monkeypatch.setattr(agent_mod, "should_triage", lambda conf, thr=None: True)
+
+    r = build_retriever(dataset.mapping)
+    item = dataset.items[0]
+    gold = item.gold_misconception_id
+    learner = SimulatedLearner(gold, dataset.mapping[gold])
+    trace = TraceLogger("looptest", sink_dir=tmp_path)
+
+    res = run_loop(
+        item, learner, r, arm="targeted", conn=db, force_offline=True,
+        with_confidence=True, k=3, trace=trace,
+    )
+    # low-confidence route queued the item even though the student resolved
+    assert res.routed_to_triage is True
+    assert len(triage_items(db)) == 1
+    # trace file captured the steps
+    steps = [row["step"] for row in trace.read()]
+    assert "diagnose" in steps and "triage" in steps
+
+
+def test_free_response_grader_stub():
+    from feedback_agent.grading import grade_free_response
+
+    rubric = "3 = explains photosynthesis: chlorophyll converts sunlight into glucose energy."
+    strong = "Photosynthesis uses chlorophyll to convert sunlight into glucose and energy."
+    weak = "Plants are green."
+    q = "Why do plants need sunlight?"
+    g_strong, _ = grade_free_response(q, rubric, strong, force_offline=True)
+    g_weak, _ = grade_free_response(q, rubric, weak, force_offline=True)
+    assert 0 <= g_weak.score <= 3 and 0 <= g_strong.score <= 3
+    assert g_strong.score > g_weak.score  # better answer scores higher
+
+
+def test_asap_loader_and_qwk_pipeline():
+    from feedback_agent import config
+
+    from .asap import load_asap, run_asap_grading
+
+    # Pin to the fixture so the suite stays fast even when real ASAP data is present.
+    items = load_asap(
+        config.FIXTURES_DIR / "asap_sample.csv", config.FIXTURES_DIR / "asap_meta.json"
+    )
+    assert len(items) >= 8
+    assert all(0 <= it.human_score <= it.max_score for it in items)
+    res = run_asap_grading(items, force_offline=True)
+    assert res["n"] == len(items)
+    assert -1.0 <= res["qwk"] <= 1.0
+    # the deterministic stub tracks the rubric, so agreement should be positive
+    assert res["qwk"] > 0.0
+
+
+def test_dashboard_helpers_offline(dataset, db):
+    # Import the Streamlit app module (must not require a running Streamlit) and
+    # exercise its pure helpers offline.
+    from app import dashboard
+
+    # a wrong-answer instance -> student feedback returns a diagnosis + hint, no leak
+    item = dataset.items[0]
+    res = dashboard.student_feedback(item, dataset.mapping, conn=db, force_offline=True)
+    assert res["is_correct"] is False
+    assert res["diagnosis"] is not None and res["intervention"] is not None
+    assert res["leaked"] is False
+
+    # triage rows helper returns a list (empty on a fresh DB)
+    assert dashboard.triage_rows(db) == []
+
+
+def test_diagnosis_item_shape():
+    it = DiagnosisItem(
+        question_id="q_A",
+        question_text="Solve 2x=4",
+        correct_answer="B",
+        correct_answer_text="x=2",
+        chosen_answer="A",
+        chosen_answer_text="x=8",
+        gold_misconception_id="1",
+    )
+    assert it.chosen_answer == "A"
